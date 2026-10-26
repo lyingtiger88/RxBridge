@@ -44,7 +44,6 @@ jobs:
           test -f apps/mobile/lib/main.dart
           test -f apps/mobile/test/widget_test.dart
           cd apps/mobile
-          flutter pub add flutter_localizations --sdk=flutter
           flutter pub get
           flutter analyze
           flutter test
@@ -69,9 +68,9 @@ jobs:
         run: |
           flutter create --platforms=android,ios --project-name rxbridge apps/mobile
           cd apps/mobile
-          flutter pub add flutter_localizations --sdk=flutter
           flutter pub get
           flutter analyze
+          flutter test
       - name: Build iOS simulator (unsigned)
         run: cd apps/mobile && flutter build ios --simulator --debug
       - name: Package iOS simulator app
