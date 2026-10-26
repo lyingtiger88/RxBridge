@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'dose_schedule.dart';
 
 void main() => runApp(const RxBridgeApp());
 
@@ -44,6 +45,24 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
   final quantity = TextEditingController();
   final insurance = TextEditingController(text: '0');
   String form = 'قرص', route = 'خوراکی', frequency = 'روزی یک نوبت';
+  String product = 'انتخاب نشده';
+  String interval = 'دستور زمان‌بندی مستقل';
+  final startTime = TextEditingController(text: '08:00');
+  static const demoProducts = <String, (String, String)>{
+    'انتخاب نشده': ('قرص', 'خوراکی'),
+    'TEST-TABLET-A (ساختگی)': ('قرص', 'خوراکی'),
+    'TEST-SYRUP-B (ساختگی)': ('شربت', 'خوراکی'),
+    'TEST-SUPPOSITORY-C (ساختگی)': ('شیاف', 'مقعدی'),
+    'TEST-INJECTION-D (ساختگی)': ('آمپول / ویال', 'عضلانی'),
+  };
+  static const intervals = <String, int>{'دستور زمان‌بندی مستقل': 0, 'هر ۲۴ ساعت': 24, 'هر ۱۲ ساعت': 12, 'هر ۸ ساعت': 8, 'هر ۶ ساعت': 6, 'هر ۴ ساعت': 4};
+  void selectProduct(String p) { product=p; form=demoProducts[p]!.$1;route=demoProducts[p]!.$2;drug.text=p=='انتخاب نشده'?'':p; }
+  String get calculatedSchedule {
+    final hours=intervals[interval]??0;
+    if(hours==0)return 'نوبت روزانه با فاصله دقیق یکی نیست؛ ساعت‌ها را پزشک باید مشخص کند.';
+    try{return exampleTimes(intervalHours:hours,start:startTime.text).join(' ، ');}catch(_){return 'زمان شروع نامعتبر است؛ قالب HH:mm لازم است.';}
+  }
+
   String stage = 'پیش‌نویس';
   final entries = <String>[];
   final timeline = <String>[];
@@ -56,7 +75,7 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
 
   @override
   void dispose() {
-    for (final c in [patient,age,weight,allergies,drug,amount,days,instructions,custom,reason,unitPrice,quantity,insurance]) { c.dispose(); }
+    for (final c in [patient,age,weight,allergies,drug,amount,days,instructions,custom,reason,unitPrice,quantity,insurance,startTime]) { c.dispose(); }
     super.dispose();
   }
 
@@ -110,6 +129,7 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
   Future<void> addDraft() async {
     if(stage!='پیش‌نویس'){message('برای افزودن دارو ابتدا نسخه آزمایشی جدید ایجاد کنید.');return;}
     final a=double.tryParse(amount.text.trim()),d=int.tryParse(days.text.trim());
+    if(intervals[interval]!=0 && calculatedSchedule.startsWith('زمان شروع نامعتبر')){message('ساعت شروع نامعتبر است.');return;}
     if(!patient.text.trim().startsWith('TEST-')||drug.text.trim().isEmpty||a==null||!a.isFinite||a<=0||d==null||d<=0){
       message('اطلاعات آزمایشی بیمار، دارو، مقدار و مدت را بررسی کنید.');return;
     }
@@ -119,7 +139,7 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
     final customNeeded=form=='سایر'||route=='سایر'||frequency=='سایر';
     if(customNeeded){
       if(custom.text.trim().isEmpty||reason.text.trim().isEmpty){message('مقدار و علت سفارشی ضروری است.');return;}
-      final snapshot=[patient.text,drug.text,amount.text,days.text,instructions.text,form,route,frequency,custom.text,reason.text].join('|');
+      final snapshot=[patient.text,drug.text,amount.text,days.text,instructions.text,form,route,frequency,interval,startTime.text,custom.text,reason.text].join('|');
       var confirmed=false;
       final ok=await showDialog<bool>(context:context,builder:(ctx)=>StatefulBuilder(builder:(ctx,update)=>AlertDialog(
         title: const Text('تأیید داده غیراستاندارد'),
@@ -136,7 +156,7 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
       }
     }
     setState((){
-      entries.add('${drug.text.trim()} | $form | $route | ${amount.text} | $frequency | ${days.text} روز');
+      entries.add('${drug.text.trim()} | $form | $route | ${amount.text} | $frequency | $interval | ${calculatedSchedule} | ${days.text} روز');
       timeline.add('قلم آزمایشی جدید ثبت شد');
       drug.clear();amount.clear();days.clear();instructions.clear();custom.clear();reason.clear();
     });
@@ -145,10 +165,16 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
 
   Widget prescription() => ListView(padding: const EdgeInsets.all(16),children:[
     title('نسخه‌نویسی','نوع دارو، مسیر تجویز، نوبت و توضیحات'),
+    choice('داروی کاتالوگ آزمایشی',product,demoProducts.keys.toList(),selectProduct),
+    const Text('فهرست فعلاً ساختگی است؛ شکل و مسیر واقعی فقط پس از اتصال بانک دارویی دارای منبع باید خودکار شوند.'),
+    const SizedBox(height: 12),
     field(drug,'نام داروی آزمایشی'),choice('شکل دارویی',form,forms,(v)=>form=v),
     choice('مسیر مصرف',route,routes,(v)=>route=v),
     field(amount,'مقدار هر نوبت (عدد نمایشی)',keyboard: TextInputType.number),
     choice('نوبت مصرف',frequency,frequencies,(v)=>frequency=v),
+    choice('فاصله زمانی دقیق (فقط در صورت تجویز)',interval,intervals.keys.toList(),(v)=>interval=v),
+    field(startTime,'ساعت شروع HH:mm'),
+    panel('پیش‌نمایش نوبت‌ها',Text(calculatedSchedule)),
     field(days,'مدت مصرف (روز)',keyboard:TextInputType.number),
     field(instructions,'دستور مصرف تکمیلی'),
     if(form=='سایر'||route=='سایر'||frequency=='سایر')...[
