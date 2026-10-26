@@ -38,6 +38,14 @@ python3 -m http.server 8080
 - برنامه نسخه‌بندی: v0.2 UI Flutter؛ v0.3 مدل و اعتبارسنجی؛ v0.4 API/Auth؛ v0.5 بانک دارو؛ v0.9 آزمون؛ v1.0 انتشار مشروط به ارزیابی ایمنی و مجوز.
 - جزئیات در `docs/ANDROID_ROADMAP.md`.
 
+## نسخه‌های موبایل و بخش Test Builds
+- کد Flutter مشترک Android و iOS در `apps/mobile/lib/main.dart` قرار دارد (نمونه آزمایشی بدون داده واقعی).
+- workflow گیت‌هاب: `.github/workflows/test-builds.yml`؛ روی push و اجرای دستی، سه کار Web، Android Debug APK و iOS Simulator اجرا می‌شوند.
+- خروجی‌های آزمایشی در [GitHub Actions](https://github.com/lyingtiger88/RxBridge/actions/workflows/test-builds.yml) و سپس در بخش **Artifacts** همان اجرا قرار خواهند گرفت، **فقط اگر job مربوطه موفق شود**.
+- فایل خروجی iOS مخصوص Simulator و بدون امضاست؛ برای نصب روی آیفون واقعی به ساخت IPA امضاشده با حساب Apple Developer نیاز است.
+- ساخت و گذر موفق workflow هنوز تأیید نشده و شماره نسخه پروژه اصلی همچنان v0.1.1 است.
+- اسناد: `docs/ANDROID_ROADMAP.md` و `docs/IOS_ROADMAP.md`.
+
 ## نقشه راه تولیدی
 - Backend: ASP.NET Core، پایگاه داده PostgreSQL و مهاجرت‌ها؛ ثبت رویداد ممیزی تغییرناپذیر
 - Frontend: Next.js/TypeScript، طراحی RTL و دو زبانه
