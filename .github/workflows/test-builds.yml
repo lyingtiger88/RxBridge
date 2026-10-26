@@ -1,0 +1,80 @@
+name: Test Builds - Web Android iOS
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web-test:
+    name: Web / Static package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check static assets
+        run: |
+          test -s index.html
+          test -s styles.css
+          test -s app.js
+          test -s pricing.js
+          node --check app.js
+          node --check pricing.js
+      - name: Package website
+        run: zip -r rxbridge-web-test.zip index.html styles.css app.js pricing.js README.md docs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RxBridge-Web-Test
+          path: rxbridge-web-test.zip
+
+  android-test:
+    name: Android / Debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Bootstrap Flutter platforms
+        run: |
+          flutter create --platforms=android,ios --project-name rxbridge apps/mobile
+          cd apps/mobile
+          flutter pub get
+          flutter analyze
+      - name: Build Android debug APK
+        run: cd apps/mobile && flutter build apk --debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RxBridge-Android-Debug-APK
+          path: apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+
+  ios-test:
+    name: iOS / Unsigned Simulator
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Bootstrap Flutter platforms
+        run: |
+          flutter create --platforms=android,ios --project-name rxbridge apps/mobile
+          cd apps/mobile
+          flutter pub get
+          flutter analyze
+      - name: Build iOS simulator (unsigned)
+        run: cd apps/mobile && flutter build ios --simulator --debug
+      - name: Package iOS simulator app
+        run: |
+          cd apps/mobile/build/ios/iphonesimulator
+          zip -qr "$GITHUB_WORKSPACE/rxbridge-ios-simulator.zip" Runner.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RxBridge-iOS-Simulator-Unsigned
+          path: rxbridge-ios-simulator.zip
+          if-no-files-found: error
