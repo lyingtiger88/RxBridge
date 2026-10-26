@@ -40,11 +40,10 @@ jobs:
           cache: true
       - name: Bootstrap Flutter platforms
         run: |
-          flutter create --platforms=android,ios --project-name rxbridge apps/mobile
+          flutter create --platforms=android,ios --project-name rxbridge apps/mobile\n          # Flutter may generate a template test referencing MyApp; replace it with our own test.\n          test -f apps/mobile/lib/main.dart\n          test -f apps/mobile/test/widget_test.dart
           cd apps/mobile
           flutter pub get
-          flutter analyze
-      - name: Build Android debug APK
+          flutter analyze\n          flutter test\n      - name: Build Android debug APK
         run: cd apps/mobile && flutter build apk --debug
       - uses: actions/upload-artifact@v4
         with:
