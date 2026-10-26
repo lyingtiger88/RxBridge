@@ -57,6 +57,12 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
   };
   static const intervals = <String, int>{'دستور زمان‌بندی مستقل': 0, 'هر ۲۴ ساعت': 24, 'هر ۱۲ ساعت': 12, 'هر ۸ ساعت': 8, 'هر ۶ ساعت': 6, 'هر ۴ ساعت': 4};
   void selectProduct(String p) { product=p; form=demoProducts[p]!.$1;route=demoProducts[p]!.$2;drug.text=p=='انتخاب نشده'?'':p; }
+  void selectInterval(String value) {
+    interval=value;
+    final hours=intervals[value]??0;
+    if(hours>0){final count=24~/hours; if(count<=4)frequency=['','روزی یک نوبت','روزی دو نوبت','روزی سه نوبت','روزی چهار نوبت'][count]; else frequency='سایر';}
+  }
+  void selectFrequency(String value){frequency=value; interval='دستور زمان‌بندی مستقل';}
   String get calculatedSchedule {
     final hours=intervals[interval]??0;
     if(hours==0)return 'نوبت روزانه با فاصله دقیق یکی نیست؛ ساعت‌ها را پزشک باید مشخص کند.';
@@ -129,6 +135,7 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
   Future<void> addDraft() async {
     if(stage!='پیش‌نویس'){message('برای افزودن دارو ابتدا نسخه آزمایشی جدید ایجاد کنید.');return;}
     final a=double.tryParse(amount.text.trim()),d=int.tryParse(days.text.trim());
+    if(product!='انتخاب نشده' && (form!=demoProducts[product]!.$1 || route!=demoProducts[product]!.$2)) {message('شکل یا مسیر این فرآورده آزمایشی تغییر کرده است؛ یک فرآورده سازگار انتخاب کنید.');return;}
     if(intervals[interval]!=0 && calculatedSchedule.startsWith('زمان شروع نامعتبر')){message('ساعت شروع نامعتبر است.');return;}
     if(!patient.text.trim().startsWith('TEST-')||drug.text.trim().isEmpty||a==null||!a.isFinite||a<=0||d==null||d<=0){
       message('اطلاعات آزمایشی بیمار، دارو، مقدار و مدت را بررسی کنید.');return;
@@ -171,8 +178,8 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
     field(drug,'نام داروی آزمایشی'),choice('شکل دارویی',form,forms,(v)=>form=v),
     choice('مسیر مصرف',route,routes,(v)=>route=v),
     field(amount,'مقدار هر نوبت (عدد نمایشی)',keyboard: TextInputType.number),
-    choice('نوبت مصرف',frequency,frequencies,(v)=>frequency=v),
-    choice('فاصله زمانی دقیق (فقط در صورت تجویز)',interval,intervals.keys.toList(),(v)=>interval=v),
+    choice('نوبت مصرف',frequency,frequencies,selectFrequency),
+    choice('فاصله زمانی دقیق (فقط در صورت تجویز)',interval,intervals.keys.toList(),selectInterval),
     field(startTime,'ساعت شروع HH:mm'),
     panel('پیش‌نمایش نوبت‌ها',Text(calculatedSchedule)),
     field(days,'مدت مصرف (روز)',keyboard:TextInputType.number),
