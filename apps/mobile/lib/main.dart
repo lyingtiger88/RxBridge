@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() => runApp(const RxBridgeApp());
 
@@ -12,6 +13,11 @@ class RxBridgeApp extends StatelessWidget {
     theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF15678C)), useMaterial3: true),
     locale: const Locale('fa'),
     supportedLocales: const [Locale('fa'), Locale('en')],
+    localizationsDelegates: const [
+      GlobalMaterialLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+    ],
     home: const Directionality(textDirection: TextDirection.rtl, child: RxBridgeHome()),
   );
 }
