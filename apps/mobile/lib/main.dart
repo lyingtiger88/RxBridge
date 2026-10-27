@@ -113,7 +113,14 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
   void selectInterval(String value) {
     interval=value;
     final hours=intervals[value]??0;
-    if(hours>0){final count=24~/hours; if(count<=4)frequency=['','روزی یک نوبت','روزی دو نوبت','روزی سه نوبت','روزی چهار نوبت'][count]; else frequency='سایر';}
+    if (hours > 0) {
+      final count = 24 ~/ hours;
+      if (count <= 4) {
+        frequency = ['', 'روزی یک نوبت', 'روزی دو نوبت', 'روزی سه نوبت', 'روزی چهار نوبت'][count];
+      } else {
+        frequency = 'سایر';
+      }
+    }
   }
   void selectFrequency(String value){frequency=value; interval='دستور زمان‌بندی مستقل';}
   String get calculatedSchedule {
@@ -129,7 +136,6 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
   static const names = ['داشبورد','بیمار','نسخه','داروساز','تحویل','قیمت','درباره'];
   static const icons = [Icons.dashboard_outlined,Icons.person_outline,Icons.medication_outlined,Icons.fact_check_outlined,Icons.inventory_2_outlined,Icons.payments_outlined,Icons.info_outline];
   static const forms = MedicationFormRoute.forms;
-  static const routes = MedicationFormRoute.allRoutes;
   static const frequencies = ['روزی یک نوبت','روزی دو نوبت','روزی سه نوبت','روزی چهار نوبت','در صورت نیاز','سایر'];
 
   @override
@@ -176,8 +182,8 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
     ])),
     const SizedBox(height: 8),
     Wrap(spacing: 8,runSpacing: 8,children:[
-      for(final pair in [(1,'ثبت بیمار'),(2,'نسخه جدید'),(3,'بررسی داروساز'),(4,'تحویل'),(5,'محاسبه قیمت')])
-        ActionChip(label: Text(pair.$2 as String),onPressed: ()=>setState(()=>selected=pair.$1 as int)),
+      for (final pair in [(1, 'ثبت بیمار'), (2, 'نسخه جدید'), (3, 'بررسی داروساز'), (4, 'تحویل'), (5, 'محاسبه قیمت')])
+        ActionChip(label: Text(pair.$2), onPressed: () => setState(() => selected = pair.$1)), 
     ]),
     const SizedBox(height: 16),
     panel('گردش کار',const Text('۱. پرونده بیمار → ۲. پیش‌نویس نسخه → ۳. بررسی داروساز → ۴. تحویل آزمایشی → ۵. قیمت‌گذاری نمایشی')),
@@ -238,7 +244,7 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
       }
     }
     setState((){
-      entries.add('${drug.text.trim()} | $form | $route | ${amount.text} | $frequency | $interval | ${calculatedSchedule} | ${days.text} روز');
+      entries.add('${drug.text.trim()} | $form | $route | ${amount.text} | $frequency | $interval | $calculatedSchedule | ${days.text} روز');
       timeline.add('قلم آزمایشی جدید ثبت شد');
       drug.clear();amount.clear();days.clear();instructions.clear();custom.clear();reason.clear();
     });
