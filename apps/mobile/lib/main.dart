@@ -150,9 +150,8 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
   Future<void> addDraft() async {
     if(stage!='پیش‌نویس'){message('برای افزودن دارو ابتدا نسخه آزمایشی جدید ایجاد کنید.');return;}
     final a=double.tryParse(amount.text.trim()),d=int.tryParse(days.text.trim());
-    if (product != 'انتخاب نشده' &&
-        (form != demoProducts[product]!.$1 || route != demoProducts[product]!.$2)) {
-      message('شکل یا مسیر این فرآورده آزمایشی تغییر کرده است؛ یک فرآورده سازگار انتخاب کنید.');
+    if (product != 'انتخاب نشده' && form != demoProducts[product]!.$1) {
+      message('شکل دارویی این فرآورده آزمایشی قابل تغییر نیست؛ فرآورده سازگار دیگری انتخاب کنید.');
       return;
     }
     if (!MedicationFormRoute.isRouteAllowed(form, route)) {
