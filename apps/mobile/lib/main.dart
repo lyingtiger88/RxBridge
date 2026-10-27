@@ -33,6 +33,44 @@ class RxBridgeHome extends StatefulWidget {
 
 class _RxBridgeHomeState extends State<RxBridgeHome> {
   int selected = 0;
+  String activeRole = 'پزشک';
+
+  void selectRole(String role) {
+    setState(() {
+      activeRole = role;
+      selected = switch (role) {
+        'پزشک' => 2,
+        'داروخانه' => 3,
+        'بیمه' => 5,
+        _ => 0,
+      };
+    });
+  }
+
+  Widget roleSwitcher() => Card(
+    margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          for (final role in ['پزشک', 'داروخانه', 'بیمه'])
+            ChoiceChip(
+              avatar: Icon(switch (role) {
+                'پزشک' => Icons.medical_services_outlined,
+                'داروخانه' => Icons.local_pharmacy_outlined,
+                _ => Icons.health_and_safety_outlined,
+              }, size: 18),
+              label: Text(role),
+              selected: activeRole == role,
+              onSelected: (_) => selectRole(role),
+            ),
+        ],
+      ),
+    ),
+  );
   final patient = TextEditingController(text: 'TEST-001');
   final age = TextEditingController();
   final weight = TextEditingController();
@@ -122,6 +160,16 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
 
   Widget dashboard() => ListView(padding: const EdgeInsets.all(16),children:[
     title('داشبورد RxBridge','مرکز مدیریت نسخه‌های آزمایشی، پزشک و داروساز'),
+    panel('انتخاب نقش برای تست',Column(crossAxisAlignment: CrossAxisAlignment.stretch,children:[
+      const Text('برای آزمایش گردش‌کار، یکی از سه محیط را انتخاب کنید. این انتخاب فقط در نسخه تستی است.'),
+      const SizedBox(height: 12),
+      FilledButton.icon(onPressed:()=>selectRole('پزشک'),icon:const Icon(Icons.medical_services_outlined),label:const Text('ورود به محیط پزشک')),
+      const SizedBox(height: 8),
+      FilledButton.icon(onPressed:()=>selectRole('داروخانه'),icon:const Icon(Icons.local_pharmacy_outlined),label:const Text('ورود به محیط داروخانه')),
+      const SizedBox(height: 8),
+      FilledButton.icon(onPressed:()=>selectRole('بیمه'),icon:const Icon(Icons.health_and_safety_outlined),label:const Text('ورود به محیط بیمه')),
+    ])),
+    const SizedBox(height: 8),
     panel('وضعیت نمونه آزمایشی',Column(crossAxisAlignment: CrossAxisAlignment.start,children:[
       Text('نسخه: $stage'),Text('تعداد اقلام: ${entries.length}'),const SizedBox(height: 8),
       const Text('تمام داده‌ها فقط در حافظه این اجرا هستند؛ سیستم بالینی واقعی نیست.'),
@@ -287,7 +335,7 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
         Navigator.pop(context);setState(()=>selected=i);
       }),
     ]))),
-    body:page(),
+    body:Column(children:[roleSwitcher(),Expanded(child:page())]),
     bottomNavigationBar:NavigationBar(selectedIndex:selected<=2?selected:0,onDestinationSelected:(i)=>setState(()=>selected=i),
       destinations:const [
         NavigationDestination(icon:Icon(Icons.dashboard_outlined),label:'داشبورد'),
