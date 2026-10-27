@@ -33,7 +33,7 @@ class RxBridgeHome extends StatefulWidget {
 
 class _RxBridgeHomeState extends State<RxBridgeHome> {
   int selected = 0;
-  String activeRole = 'پزشک';
+  String activeRole = 'انتخاب نقش';
 
   void selectRole(String role) {
     setState(() {
