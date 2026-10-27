@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dose_schedule.dart';
 import 'custom_entry_snapshot.dart';
+import 'medication_form_route.dart';
 
 void main() => runApp(const RxBridgeApp());
 
@@ -52,12 +53,25 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
   static const demoProducts = <String, (String, String)>{
     'انتخاب نشده': ('قرص', 'خوراکی'),
     'TEST-TABLET-A (ساختگی)': ('قرص', 'خوراکی'),
+    'TEST-CHEWABLE-TABLET (ساختگی)': ('قرص جویدنی', 'خوراکی - جویدنی'),
+    'TEST-SUBLINGUAL-TABLET (ساختگی)': ('قرص زیرزبانی', 'زیرزبانی'),
     'TEST-SYRUP-B (ساختگی)': ('شربت', 'خوراکی'),
-    'TEST-SUPPOSITORY-C (ساختگی)': ('شیاف', 'مقعدی'),
-    'TEST-INJECTION-D (ساختگی)': ('آمپول / ویال', 'عضلانی'),
+    'TEST-SUPPOSITORY-C (ساختگی)': ('شیاف مقعدی', 'مقعدی'),
+    'TEST-VAGINAL-PESSARY (ساختگی)': ('فرآورده واژینال', 'واژینال'),
+    'TEST-INJECTION-D (ساختگی)': ('آمپول / ویال', 'تزریقی (نوع مشخص نشده)'),
   };
   static const intervals = <String, int>{'دستور زمان‌بندی مستقل': 0, 'هر ۲۴ ساعت': 24, 'هر ۱۲ ساعت': 12, 'هر ۸ ساعت': 8, 'هر ۶ ساعت': 6, 'هر ۴ ساعت': 4};
-  void selectProduct(String p) { product=p; form=demoProducts[p]!.$1;route=demoProducts[p]!.$2;drug.text=p=='انتخاب نشده'?'':p; }
+  void selectProduct(String p) {
+    product = p;
+    form = demoProducts[p]!.$1;
+    route = demoProducts[p]!.$2;
+    drug.text = p == 'انتخاب نشده' ? '' : p;
+  }
+  void selectForm(String value) {
+    form = value;
+    route = MedicationFormRoute.defaultRouteFor(value);
+  }
+  List<String> get availableRoutes => MedicationFormRoute.routesFor(form);
   void selectInterval(String value) {
     interval=value;
     final hours=intervals[value]??0;
@@ -76,8 +90,8 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
 
   static const names = ['داشبورد','بیمار','نسخه','داروساز','تحویل','قیمت','درباره'];
   static const icons = [Icons.dashboard_outlined,Icons.person_outline,Icons.medication_outlined,Icons.fact_check_outlined,Icons.inventory_2_outlined,Icons.payments_outlined,Icons.info_outline];
-  static const forms = ['قرص','کپسول','شربت','آمپول / ویال','شیاف','قطره','پماد','اسپری','سایر'];
-  static const routes = ['خوراکی','عضلانی','وریدی','زیرجلدی','مقعدی','موضعی','چشمی','گوشی','استنشاقی','سایر'];
+  static const forms = MedicationFormRoute.forms;
+  static const routes = MedicationFormRoute.allRoutes;
   static const frequencies = ['روزی یک نوبت','روزی دو نوبت','روزی سه نوبت','روزی چهار نوبت','در صورت نیاز','سایر'];
 
   @override
@@ -136,7 +150,19 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
   Future<void> addDraft() async {
     if(stage!='پیش‌نویس'){message('برای افزودن دارو ابتدا نسخه آزمایشی جدید ایجاد کنید.');return;}
     final a=double.tryParse(amount.text.trim()),d=int.tryParse(days.text.trim());
-    if(product!='انتخاب نشده' && (form!=demoProducts[product]!.$1 || route!=demoProducts[product]!.$2)) {message('شکل یا مسیر این فرآورده آزمایشی تغییر کرده است؛ یک فرآورده سازگار انتخاب کنید.');return;}
+    if (product != 'انتخاب نشده' &&
+        (form != demoProducts[product]!.$1 || route != demoProducts[product]!.$2)) {
+      message('شکل یا مسیر این فرآورده آزمایشی تغییر کرده است؛ یک فرآورده سازگار انتخاب کنید.');
+      return;
+    }
+    if (!MedicationFormRoute.isRouteAllowed(form, route)) {
+      message('مسیر مصرف با شکل دارویی سازگار نیست؛ مسیر مناسب را انتخاب کنید.');
+      return;
+    }
+    if (MedicationFormRoute.requiresSpecificRoute(form, route)) {
+      message('مسیر دقیق این شکل دارویی مشخص نیست؛ پیش از ثبت باید مسیر مصرف تأیید شود.');
+      return;
+    }
     if(intervals[interval]!=0 && calculatedSchedule.startsWith('زمان شروع نامعتبر')){message('ساعت شروع نامعتبر است.');return;}
     if(!patient.text.trim().startsWith('TEST-')||drug.text.trim().isEmpty||a==null||!a.isFinite||a<=0||d==null||d<=0){
       message('اطلاعات آزمایشی بیمار، دارو، مقدار و مدت را بررسی کنید.');return;
@@ -177,8 +203,11 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
     choice('داروی کاتالوگ آزمایشی',product,demoProducts.keys.toList(),selectProduct),
     const Text('فهرست فعلاً ساختگی است؛ شکل و مسیر واقعی فقط پس از اتصال بانک دارویی دارای منبع باید خودکار شوند.'),
     const SizedBox(height: 12),
-    field(drug,'نام داروی آزمایشی'),choice('شکل دارویی',form,forms,(v)=>form=v),
-    choice('مسیر مصرف',route,routes,(v)=>route=v),
+    field(drug,'نام داروی آزمایشی'),
+    choice('شکل دارویی', form, forms, selectForm),
+    choice('مسیر مصرف', route, availableRoutes, (v) => route = v),
+    Text(MedicationFormRoute.helpTextFor(form), style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+    const SizedBox(height: 12),
     field(amount,'مقدار هر نوبت (عدد نمایشی)',keyboard: TextInputType.number),
     choice('نوبت مصرف',frequency,frequencies,selectFrequency),
     choice('فاصله زمانی دقیق (فقط در صورت تجویز)',interval,intervals.keys.toList(),selectInterval),
