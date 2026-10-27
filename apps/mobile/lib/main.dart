@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dose_schedule.dart';
+import 'custom_entry_snapshot.dart';
 
 void main() => runApp(const RxBridgeApp());
 
@@ -146,7 +147,7 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
     final customNeeded=form=='سایر'||route=='سایر'||frequency=='سایر';
     if(customNeeded){
       if(custom.text.trim().isEmpty||reason.text.trim().isEmpty){message('مقدار و علت سفارشی ضروری است.');return;}
-      final snapshot=[patient.text,drug.text,amount.text,days.text,instructions.text,form,route,frequency,interval,startTime.text,custom.text,reason.text].join('|');
+      final snapshot = buildCustomEntrySnapshot(patient: patient.text, drug: drug.text, amount: amount.text, days: days.text, instructions: instructions.text, form: form, route: route, frequency: frequency, interval: interval, startTime: startTime.text, custom: custom.text, reason: reason.text);
       var confirmed=false;
       final ok=await showDialog<bool>(context:context,builder:(ctx)=>StatefulBuilder(builder:(ctx,update)=>AlertDialog(
         title: const Text('تأیید داده غیراستاندارد'),
@@ -158,7 +159,8 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
           FilledButton(onPressed:confirmed?()=>Navigator.pop(ctx,true):null,child:const Text('افزودن به پیش‌نویس'))],
       )));
       if(!mounted||ok!=true)return;
-      if(snapshot!=[patient.text,drug.text,amount.text,days.text,instructions.text,form,route,frequency,custom.text,reason.text].join('|')){
+      final currentSnapshot = buildCustomEntrySnapshot(patient: patient.text, drug: drug.text, amount: amount.text, days: days.text, instructions: instructions.text, form: form, route: route, frequency: frequency, interval: interval, startTime: startTime.text, custom: custom.text, reason: reason.text);
+      if (snapshot != currentSnapshot) {
         message('داده تغییر کرده است؛ تأیید دوباره الزامی است.');return;
       }
     }
