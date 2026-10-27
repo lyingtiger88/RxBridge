@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dose_schedule.dart';
+import 'custom_entry_snapshot.dart';
+import 'medication_form_route.dart';
 
 void main() => runApp(const RxBridgeApp());
 
@@ -31,6 +33,44 @@ class RxBridgeHome extends StatefulWidget {
 
 class _RxBridgeHomeState extends State<RxBridgeHome> {
   int selected = 0;
+  String activeRole = 'انتخاب نقش';
+
+  void selectRole(String role) {
+    setState(() {
+      activeRole = role;
+      selected = switch (role) {
+        'پزشک' => 2,
+        'داروخانه' => 3,
+        'بیمه' => 5,
+        _ => 0,
+      };
+    });
+  }
+
+  Widget roleSwitcher() => Card(
+    margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          for (final role in ['پزشک', 'داروخانه', 'بیمه'])
+            ChoiceChip(
+              avatar: Icon(switch (role) {
+                'پزشک' => Icons.medical_services_outlined,
+                'داروخانه' => Icons.local_pharmacy_outlined,
+                _ => Icons.health_and_safety_outlined,
+              }, size: 18),
+              label: Text(role),
+              selected: activeRole == role,
+              onSelected: (_) => selectRole(role),
+            ),
+        ],
+      ),
+    ),
+  );
   final patient = TextEditingController(text: 'TEST-001');
   final age = TextEditingController();
   final weight = TextEditingController();
@@ -51,16 +91,36 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
   static const demoProducts = <String, (String, String)>{
     'انتخاب نشده': ('قرص', 'خوراکی'),
     'TEST-TABLET-A (ساختگی)': ('قرص', 'خوراکی'),
+    'TEST-CHEWABLE-TABLET (ساختگی)': ('قرص جویدنی', 'خوراکی - جویدنی'),
+    'TEST-SUBLINGUAL-TABLET (ساختگی)': ('قرص زیرزبانی', 'زیرزبانی'),
     'TEST-SYRUP-B (ساختگی)': ('شربت', 'خوراکی'),
-    'TEST-SUPPOSITORY-C (ساختگی)': ('شیاف', 'مقعدی'),
-    'TEST-INJECTION-D (ساختگی)': ('آمپول / ویال', 'عضلانی'),
+    'TEST-SUPPOSITORY-C (ساختگی)': ('شیاف مقعدی', 'مقعدی'),
+    'TEST-VAGINAL-PESSARY (ساختگی)': ('فرآورده واژینال', 'واژینال'),
+    'TEST-INJECTION-D (ساختگی)': ('آمپول / ویال', 'تزریقی (نوع مشخص نشده)'),
   };
   static const intervals = <String, int>{'دستور زمان‌بندی مستقل': 0, 'هر ۲۴ ساعت': 24, 'هر ۱۲ ساعت': 12, 'هر ۸ ساعت': 8, 'هر ۶ ساعت': 6, 'هر ۴ ساعت': 4};
-  void selectProduct(String p) { product=p; form=demoProducts[p]!.$1;route=demoProducts[p]!.$2;drug.text=p=='انتخاب نشده'?'':p; }
+  void selectProduct(String p) {
+    product = p;
+    form = demoProducts[p]!.$1;
+    route = demoProducts[p]!.$2;
+    drug.text = p == 'انتخاب نشده' ? '' : p;
+  }
+  void selectForm(String value) {
+    form = value;
+    route = MedicationFormRoute.defaultRouteFor(value);
+  }
+  List<String> get availableRoutes => MedicationFormRoute.routesFor(form);
   void selectInterval(String value) {
     interval=value;
     final hours=intervals[value]??0;
-    if(hours>0){final count=24~/hours; if(count<=4)frequency=['','روزی یک نوبت','روزی دو نوبت','روزی سه نوبت','روزی چهار نوبت'][count]; else frequency='سایر';}
+    if (hours > 0) {
+      final count = 24 ~/ hours;
+      if (count <= 4) {
+        frequency = ['', 'روزی یک نوبت', 'روزی دو نوبت', 'روزی سه نوبت', 'روزی چهار نوبت'][count];
+      } else {
+        frequency = 'سایر';
+      }
+    }
   }
   void selectFrequency(String value){frequency=value; interval='دستور زمان‌بندی مستقل';}
   String get calculatedSchedule {
@@ -75,8 +135,7 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
 
   static const names = ['داشبورد','بیمار','نسخه','داروساز','تحویل','قیمت','درباره'];
   static const icons = [Icons.dashboard_outlined,Icons.person_outline,Icons.medication_outlined,Icons.fact_check_outlined,Icons.inventory_2_outlined,Icons.payments_outlined,Icons.info_outline];
-  static const forms = ['قرص','کپسول','شربت','آمپول / ویال','شیاف','قطره','پماد','اسپری','سایر'];
-  static const routes = ['خوراکی','عضلانی','وریدی','زیرجلدی','مقعدی','موضعی','چشمی','گوشی','استنشاقی','سایر'];
+  static const forms = MedicationFormRoute.forms;
   static const frequencies = ['روزی یک نوبت','روزی دو نوبت','روزی سه نوبت','روزی چهار نوبت','در صورت نیاز','سایر'];
 
   @override
@@ -107,14 +166,24 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
 
   Widget dashboard() => ListView(padding: const EdgeInsets.all(16),children:[
     title('داشبورد RxBridge','مرکز مدیریت نسخه‌های آزمایشی، پزشک و داروساز'),
+    panel('انتخاب نقش برای تست',Column(crossAxisAlignment: CrossAxisAlignment.stretch,children:[
+      const Text('برای آزمایش گردش‌کار، یکی از سه محیط را انتخاب کنید. این انتخاب فقط در نسخه تستی است.'),
+      const SizedBox(height: 12),
+      FilledButton.icon(onPressed:()=>selectRole('پزشک'),icon:const Icon(Icons.medical_services_outlined),label:const Text('ورود به محیط پزشک')),
+      const SizedBox(height: 8),
+      FilledButton.icon(onPressed:()=>selectRole('داروخانه'),icon:const Icon(Icons.local_pharmacy_outlined),label:const Text('ورود به محیط داروخانه')),
+      const SizedBox(height: 8),
+      FilledButton.icon(onPressed:()=>selectRole('بیمه'),icon:const Icon(Icons.health_and_safety_outlined),label:const Text('ورود به محیط بیمه')),
+    ])),
+    const SizedBox(height: 8),
     panel('وضعیت نمونه آزمایشی',Column(crossAxisAlignment: CrossAxisAlignment.start,children:[
       Text('نسخه: $stage'),Text('تعداد اقلام: ${entries.length}'),const SizedBox(height: 8),
       const Text('تمام داده‌ها فقط در حافظه این اجرا هستند؛ سیستم بالینی واقعی نیست.'),
     ])),
     const SizedBox(height: 8),
     Wrap(spacing: 8,runSpacing: 8,children:[
-      for(final pair in [(1,'ثبت بیمار'),(2,'نسخه جدید'),(3,'بررسی داروساز'),(4,'تحویل'),(5,'محاسبه قیمت')])
-        ActionChip(label: Text(pair.$2 as String),onPressed: ()=>setState(()=>selected=pair.$1 as int)),
+      for (final pair in [(1, 'ثبت بیمار'), (2, 'نسخه جدید'), (3, 'بررسی داروساز'), (4, 'تحویل'), (5, 'محاسبه قیمت')])
+        ActionChip(label: Text(pair.$2), onPressed: () => setState(() => selected = pair.$1)), 
     ]),
     const SizedBox(height: 16),
     panel('گردش کار',const Text('۱. پرونده بیمار → ۲. پیش‌نویس نسخه → ۳. بررسی داروساز → ۴. تحویل آزمایشی → ۵. قیمت‌گذاری نمایشی')),
@@ -135,7 +204,18 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
   Future<void> addDraft() async {
     if(stage!='پیش‌نویس'){message('برای افزودن دارو ابتدا نسخه آزمایشی جدید ایجاد کنید.');return;}
     final a=double.tryParse(amount.text.trim()),d=int.tryParse(days.text.trim());
-    if(product!='انتخاب نشده' && (form!=demoProducts[product]!.$1 || route!=demoProducts[product]!.$2)) {message('شکل یا مسیر این فرآورده آزمایشی تغییر کرده است؛ یک فرآورده سازگار انتخاب کنید.');return;}
+    if (product != 'انتخاب نشده' && form != demoProducts[product]!.$1) {
+      message('شکل دارویی این فرآورده آزمایشی قابل تغییر نیست؛ فرآورده سازگار دیگری انتخاب کنید.');
+      return;
+    }
+    if (!MedicationFormRoute.isRouteAllowed(form, route)) {
+      message('مسیر مصرف با شکل دارویی سازگار نیست؛ مسیر مناسب را انتخاب کنید.');
+      return;
+    }
+    if (MedicationFormRoute.requiresSpecificRoute(form, route)) {
+      message('مسیر دقیق این شکل دارویی مشخص نیست؛ پیش از ثبت باید مسیر مصرف تأیید شود.');
+      return;
+    }
     if(intervals[interval]!=0 && calculatedSchedule.startsWith('زمان شروع نامعتبر')){message('ساعت شروع نامعتبر است.');return;}
     if(!patient.text.trim().startsWith('TEST-')||drug.text.trim().isEmpty||a==null||!a.isFinite||a<=0||d==null||d<=0){
       message('اطلاعات آزمایشی بیمار، دارو، مقدار و مدت را بررسی کنید.');return;
@@ -146,7 +226,7 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
     final customNeeded=form=='سایر'||route=='سایر'||frequency=='سایر';
     if(customNeeded){
       if(custom.text.trim().isEmpty||reason.text.trim().isEmpty){message('مقدار و علت سفارشی ضروری است.');return;}
-      final snapshot=[patient.text,drug.text,amount.text,days.text,instructions.text,form,route,frequency,interval,startTime.text,custom.text,reason.text].join('|');
+      final snapshot = buildCustomEntrySnapshot(patient: patient.text, drug: drug.text, amount: amount.text, days: days.text, instructions: instructions.text, form: form, route: route, frequency: frequency, interval: interval, startTime: startTime.text, custom: custom.text, reason: reason.text);
       var confirmed=false;
       final ok=await showDialog<bool>(context:context,builder:(ctx)=>StatefulBuilder(builder:(ctx,update)=>AlertDialog(
         title: const Text('تأیید داده غیراستاندارد'),
@@ -158,12 +238,13 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
           FilledButton(onPressed:confirmed?()=>Navigator.pop(ctx,true):null,child:const Text('افزودن به پیش‌نویس'))],
       )));
       if(!mounted||ok!=true)return;
-      if(snapshot!=[patient.text,drug.text,amount.text,days.text,instructions.text,form,route,frequency,custom.text,reason.text].join('|')){
+      final currentSnapshot = buildCustomEntrySnapshot(patient: patient.text, drug: drug.text, amount: amount.text, days: days.text, instructions: instructions.text, form: form, route: route, frequency: frequency, interval: interval, startTime: startTime.text, custom: custom.text, reason: reason.text);
+      if (snapshot != currentSnapshot) {
         message('داده تغییر کرده است؛ تأیید دوباره الزامی است.');return;
       }
     }
     setState((){
-      entries.add('${drug.text.trim()} | $form | $route | ${amount.text} | $frequency | $interval | ${calculatedSchedule} | ${days.text} روز');
+      entries.add('${drug.text.trim()} | $form | $route | ${amount.text} | $frequency | $interval | $calculatedSchedule | ${days.text} روز');
       timeline.add('قلم آزمایشی جدید ثبت شد');
       drug.clear();amount.clear();days.clear();instructions.clear();custom.clear();reason.clear();
     });
@@ -175,8 +256,11 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
     choice('داروی کاتالوگ آزمایشی',product,demoProducts.keys.toList(),selectProduct),
     const Text('فهرست فعلاً ساختگی است؛ شکل و مسیر واقعی فقط پس از اتصال بانک دارویی دارای منبع باید خودکار شوند.'),
     const SizedBox(height: 12),
-    field(drug,'نام داروی آزمایشی'),choice('شکل دارویی',form,forms,(v)=>form=v),
-    choice('مسیر مصرف',route,routes,(v)=>route=v),
+    field(drug,'نام داروی آزمایشی'),
+    choice('شکل دارویی', form, forms, selectForm),
+    choice('مسیر مصرف', route, availableRoutes, (v) => route = v),
+    Text(MedicationFormRoute.helpTextFor(form), style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+    const SizedBox(height: 12),
     field(amount,'مقدار هر نوبت (عدد نمایشی)',keyboard: TextInputType.number),
     choice('نوبت مصرف',frequency,frequencies,selectFrequency),
     choice('فاصله زمانی دقیق (فقط در صورت تجویز)',interval,intervals.keys.toList(),selectInterval),
@@ -241,7 +325,28 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
   Widget about() => ListView(padding:const EdgeInsets.all(16),children:[
     title('درباره RxBridge','پل نسخه‌نویسی پزشک و داروساز | برنامه چندسکویی'),
     panel('نسخه نمایشی',const Text('صفحات بیمار، نسخه، بررسی داروساز، تحویل و محاسبات مالی آزمایشی برای Android و iOS.')),
-    panel('نقشه راه',const Text('v0.2 رابط و فرم‌های اولیه\nv0.3 اعتبارسنجی و داده ساختاریافته\nv0.4 API و ورود امن\nv0.5 بانک دارویی معتبر\nv0.6 قیمت رسمی و قواعد مالی پس از دریافت دسترسی\nv0.9 امنیت و بررسی بالینی\nv1.0 انتشار پس از الزامات قانونی')),
+    panel('طنز تلخ سامانه‌های دارویی 😂',const Text('''راهنمای مصرف دارو در نسخهٔ آزمایشی سامانه:
+
+• شیاف را قرقره کنید! 🥤
+• آمپول را میل کنید! 🥛
+• قرص را به پوست بمالید! 🧴
+• پماد را در چشم بچکانید! 👁️
+• قطره را شیاف کنید! 💊
+
+و اگر بیمار هنوز زنده بود، برای ادامهٔ درمان به پشتیبانی سامانه مراجعه کند! 😂
+
+وقتی فرم دارویی با روش مصرف قهر می‌کند و مسیر تجویز را هوش مصنوعیِ قاطی‌کرده تعیین می‌کند، دیگر نسخه‌نویسی نیست؛ بازی با جان بیمار است!
+
+RxBridge؛ تلاشی برای اینکه دارو همان دارو بماند و روش مصرفش هم یادش نرود!
+
+این متن طنز است؛ هیچ‌کدام از روش‌های مصرف بالا را امتحان نکنید. مگر اینکه بخواهید دارو هم از شما شکایت کند!''')),
+    panel('نقشه راه',const Text('''v0.2 رابط و فرم‌های اولیه
+v0.3 اعتبارسنجی و داده ساختاریافته
+v0.4 API و ورود امن
+v0.5 بانک دارویی معتبر
+v0.6 قیمت رسمی و قواعد مالی پس از دریافت دسترسی
+v0.9 امنیت و بررسی بالینی
+v1.0 انتشار پس از الزامات قانونی''')),
     panel('توجه ایمنی',const Text('این اپ فعلاً نمایشی است؛ احراز هویت واقعی، کنترل بالینی، تأیید بیمه و صدور نسخه قانونی ندارد. هیچ اطلاعات واقعی بیمار وارد نکنید.')),
   ]);
 
@@ -257,7 +362,7 @@ class _RxBridgeHomeState extends State<RxBridgeHome> {
         Navigator.pop(context);setState(()=>selected=i);
       }),
     ]))),
-    body:page(),
+    body:Column(children:[roleSwitcher(),Expanded(child:page())]),
     bottomNavigationBar:NavigationBar(selectedIndex:selected<=2?selected:0,onDestinationSelected:(i)=>setState(()=>selected=i),
       destinations:const [
         NavigationDestination(icon:Icon(Icons.dashboard_outlined),label:'داشبورد'),

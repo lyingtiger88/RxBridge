@@ -1,6 +1,6 @@
 # RxBridge Android development roadmap
 
-**Planning document, 2026-10-26.** Android code, APK and release signing are not yet implemented.
+**Updated: 2026-10-27.** A Flutter demo workspace exists in `apps/mobile`, including a Persian RTL UI, synthetic workflow, unit/widget tests, and a GitHub Actions job configured to build a debug APK. Successful build status and downloadable artifacts must be verified from the corresponding Actions run; no production APK or release signing is claimed.
 
 ## Platform strategy
 - **Flutter/Dart** Android-first for shared future iOS support.
@@ -8,10 +8,12 @@
 - Keep prescription calculation/validation on an independently tested server service; local UI validation is not clinical authorization.
 - Distinct builds/environments: demo (synthetic records) and production (only once reviewed and approved).
 
-## Milestones (targets; not completed)
+## Milestones
+The initial UI and demo workflow exist. The following are remaining milestones; they are not claims of completed production functionality.
+
 | Target | Scope | Acceptance |
 | --- | --- | --- |
-| v0.2.0 | Flutter project, design system, Persian RTL, responsive Android pages, About & Roadmap | Debug APK compiles; navigation and accessibility basics tested |
+| v0.2.0 | Stabilize existing Flutter demo, design system, Persian RTL, About & Roadmap | CI debug APK build passes; navigation and accessibility basics tested |
 | v0.3.0 | Structured medication fields, administration route, dosing schedule, custom-field rationale and reconfirmation | Widget/unit tests for input and invalidation on edit |
 | v0.4.0 | Backend API client, scoped login, draft sync, offline read-only strategy, audit | Auth and role tests; no real health data in debug/demo |
 | v0.5.0 | Versioned drug catalog, product-specific route constraints, safety rule provenance | Pharmacist review and automated verification suite |
