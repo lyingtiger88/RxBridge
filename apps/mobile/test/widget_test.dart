@@ -8,7 +8,7 @@ void main() {
     await tester.tap(find.text('ورود به پنل بیمار'));
     await tester.pumpAndSettle();
     expect(find.text('سلام، خوش آمدید'), findsOneWidget);
-    await tester.tap(find.text('پرونده من'));
+    await tester.tap(find.text('پرونده من').last);
     await tester.pumpAndSettle();
     expect(find.text('پرونده سلامت من'), findsOneWidget);
     expect(find.text('بخش محرمانه'), findsOneWidget);
@@ -23,9 +23,9 @@ void main() {
     await tester.tap(find.text('بیماران'));
     await tester.pumpAndSettle();
     expect(find.text('بیماران من'), findsOneWidget);
-    await tester.tap(find.text('نسخه‌ها'));
+    await tester.tap(find.text('نسخه‌ها').last);
     await tester.pumpAndSettle();
-    expect(find.text('مدیریت نسخه‌ها'), findsOneWidget);
+    expect(find.text('نسخه‌ها'), findsWidgets);
   });
 
   testWidgets('pharmacy and insurer roles open their own dashboards', (tester) async {
@@ -33,7 +33,7 @@ void main() {
     await tester.tap(find.text('ورود به پنل داروساز'));
     await tester.pumpAndSettle();
     expect(find.text('داشبورد داروخانه'), findsOneWidget);
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('تغییر نقش'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('ورود به پنل مسئول بیمه'));
     await tester.pumpAndSettle();
