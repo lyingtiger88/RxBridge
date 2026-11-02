@@ -256,10 +256,15 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
     onTap: onTap, borderRadius: BorderRadius.circular(16),
     child: Container(padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 14), decoration: BoxDecoration(color: const Color(0xFFF6FAFC), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE7EEF2))), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: teal, size: 19), const SizedBox(width: 8), Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: ink))])),
   );
-  Widget _rowItem(IconData icon, String title, String subtitle, {Color color = teal, Widget? trailing}) => ListTile(
-    contentPadding: EdgeInsets.zero, leading: Container(width: 42, height: 42, decoration: BoxDecoration(color: color.withValues(alpha: .10), borderRadius: BorderRadius.circular(13)), child: Icon(icon, color: color)),
-    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: ink)),
-    subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: muted)), trailing: trailing,
+  Widget _rowItem(IconData icon, String title, String subtitle, {Color color = teal, Widget? trailing}) => Material(
+    color: Colors.transparent,
+    child: ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Container(width: 42, height: 42, decoration: BoxDecoration(color: color.withValues(alpha: .10), borderRadius: BorderRadius.circular(13)), child: Icon(icon, color: color)),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: ink)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: muted)),
+      trailing: trailing,
+    ),
   );
   Widget _banner(String text, IconData icon, Color bg, Color fg) => Container(padding: const EdgeInsets.all(13), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(15)), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(icon, color: fg, size: 19), const SizedBox(width: 9), Expanded(child: Text(text, style: TextStyle(color: fg, fontSize: 11, height: 1.55)))]));
   Widget _doctorPage() {
