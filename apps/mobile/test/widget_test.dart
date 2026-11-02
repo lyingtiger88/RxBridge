@@ -11,7 +11,9 @@ void main() {
     await tester.tap(find.text('پرونده من').last);
     await tester.pumpAndSettle();
     expect(find.text('پرونده سلامت من'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('بخش محرمانه'), 250, scrollable: find.byType(Scrollable).last);
     expect(find.text('بخش محرمانه'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('مجوزهای دسترسی'), 250, scrollable: find.byType(Scrollable).last);
     expect(find.text('مجوزهای دسترسی'), findsOneWidget);
   });
 
@@ -35,6 +37,7 @@ void main() {
     expect(find.text('داشبورد داروخانه'), findsOneWidget);
     await tester.tap(find.byTooltip('تغییر نقش'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('ورود به پنل مسئول بیمه'), 250, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.text('ورود به پنل مسئول بیمه'));
     await tester.pumpAndSettle();
     expect(find.text('داشبورد بیمه'), findsOneWidget);
