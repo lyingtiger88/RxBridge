@@ -41,6 +41,25 @@ jobs:
       - name: Bootstrap Flutter platforms
         run: |
           flutter create --platforms=android,ios --project-name rxbridge apps/mobile
+      - name: Set app display name
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import plistlib
+          import re
+          manifest = Path("apps/mobile/android/app/src/main/AndroidManifest.xml")
+          xml = manifest.read_text()
+          xml, count = re.subn(r'android:label="[^"]+"', 'android:label="پل سلامت"', xml, count=1)
+          if count == 0:
+              raise SystemExit("Android app label was not found")
+          manifest.write_text(xml)
+          plist_path = Path("apps/mobile/ios/Runner/Info.plist")
+          with plist_path.open("rb") as source:
+              info = plistlib.load(source)
+          info["CFBundleDisplayName"] = "پل سلامت"
+          with plist_path.open("wb") as target:
+              plistlib.dump(info, target)
+          PY
           test -f apps/mobile/lib/main.dart
           test -f apps/mobile/test/widget_test.dart
           cd apps/mobile
@@ -67,6 +86,25 @@ jobs:
       - name: Bootstrap Flutter platforms
         run: |
           flutter create --platforms=android,ios --project-name rxbridge apps/mobile
+      - name: Set app display name
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import plistlib
+          import re
+          manifest = Path("apps/mobile/android/app/src/main/AndroidManifest.xml")
+          xml = manifest.read_text()
+          xml, count = re.subn(r'android:label="[^"]+"', 'android:label="پل سلامت"', xml, count=1)
+          if count == 0:
+              raise SystemExit("Android app label was not found")
+          manifest.write_text(xml)
+          plist_path = Path("apps/mobile/ios/Runner/Info.plist")
+          with plist_path.open("rb") as source:
+              info = plistlib.load(source)
+          info["CFBundleDisplayName"] = "پل سلامت"
+          with plist_path.open("wb") as target:
+              plistlib.dump(info, target)
+          PY
           cd apps/mobile
           flutter pub get
           flutter analyze
