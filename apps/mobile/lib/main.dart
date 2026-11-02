@@ -25,7 +25,7 @@ extension AppRoleInfo on AppRole {
     AppRole.insurance => 'گزارش‌ها و آمار خدمات بیمه‌ای',
   };
   IconData get icon => switch (this) {
-    AppRole.doctor => Icons.stethoscope_rounded,
+    AppRole.doctor => Icons.medical_services_rounded,
     AppRole.patient => Icons.person_rounded,
     AppRole.pharmacy => Icons.local_pharmacy_rounded,
     AppRole.insurance => Icons.health_and_safety_rounded,
