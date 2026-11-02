@@ -42,7 +42,7 @@ class RxBridgeApp extends StatelessWidget {
   const RxBridgeApp({super.key});
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'RxBridge',
+    title: 'پل سلامت | RxBridge',
     debugShowCheckedModeBanner: false,
     locale: const Locale('fa'),
     supportedLocales: const [Locale('fa'), Locale('en')],
@@ -100,9 +100,9 @@ class RoleSelectionPage extends StatelessWidget {
         Center(child: Column(children: [
           const BrandMark(size: 76),
           const SizedBox(height: 18),
-          const Text('RxBridge', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: navy, letterSpacing: .3)),
+          const Text('پل سلامت', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: navy, letterSpacing: .3)),
           const SizedBox(height: 6),
-          Text('ارتباط هوشمند در مسیر مراقبت سلامت', style: TextStyle(color: muted, fontSize: 13)),
+          Text('RxBridge • ارتباط هوشمند در مسیر مراقبت سلامت', style: TextStyle(color: muted, fontSize: 13)),
         ])),
         const SizedBox(height: 36),
         const Text('به RxBridge خوش آمدید', textAlign: TextAlign.right, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: ink)),
@@ -210,7 +210,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
     appBar: AppBar(
       leading: IconButton(tooltip: 'تغییر نقش', onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.arrow_forward_rounded)),
       title: Row(children: [const BrandMark(size: 34), const SizedBox(width: 10), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('RxBridge', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: navy)),
+        const Text('پل سلامت', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: navy)),
         Text('پنل ${widget.role.title}', style: const TextStyle(fontSize: 10, color: muted)),
       ])]),
       actions: [IconButton(tooltip: 'اعلان‌ها', onPressed: () => _toast('اعلان جدیدی وجود ندارد.'), icon: const Icon(Icons.notifications_none_rounded)), const SizedBox(width: 6)],
