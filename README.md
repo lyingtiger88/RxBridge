@@ -1,4 +1,4 @@
-# RxBridge | پل نسخه‌نویسی پزشک و داروساز
+# پل سلامت (RxBridge) | پل ارتباط پزشک، بیمار و داروساز
 
 **Status: v0.1.1 prototype — NOT FOR CLINICAL USE**
 
@@ -10,6 +10,10 @@
 python3 -m http.server 8080
 ```
 سپس آدرس `http://localhost:8080` را باز کنید.
+
+## نام و هویت برنامه
+- نام نمایشی فارسی برنامه در صفحه شروع، نوار بالایی و خروجی Android/iOS: **پل سلامت**.
+- نام فنی و شناسه پروژه برای سازگاری مخزن و توسعه بین‌المللی: `RxBridge`.
 
 ## بازطراحی رابط کاربری موبایل
 - صفحه شروع و انتخاب محیط کاربری پزشک، بیمار، داروساز و مسئول بیمه
@@ -53,7 +57,7 @@ python3 -m http.server 8080
 - workflow گیت‌هاب: `.github/workflows/test-builds.yml`؛ روی push و اجرای دستی، سه کار Web، Android Debug APK و iOS Simulator اجرا می‌شوند.
 - خروجی‌های آزمایشی در [GitHub Actions](https://github.com/lyingtiger88/RxBridge/actions/workflows/test-builds.yml) و سپس در بخش **Artifacts** همان اجرا قرار خواهند گرفت، **فقط اگر job مربوطه موفق شود**.
 - فایل خروجی iOS مخصوص Simulator و بدون امضاست؛ برای نصب روی آیفون واقعی به ساخت IPA امضاشده با حساب Apple Developer نیاز است.
-- ساخت و گذر موفق workflow هنوز تأیید نشده و شماره نسخه پروژه اصلی همچنان v0.1.1 است.
+- ساخت و گذر موفق workflow هنوز تأیید نشده و نام نمایشی محصول «پل سلامت» است؛ شناسه فنی پروژه `RxBridge` حفظ می‌شود.
 - اسناد: `docs/ANDROID_ROADMAP.md` و `docs/IOS_ROADMAP.md`.
 
 ## معماری پرونده بیمار، پروفایل پزشک و رضایت‌مندی
