@@ -344,7 +344,16 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _banner('این بخش برای اطلاعات حساس سلامت است. در نسخه واقعی، دسترسی پزشک به رضایت جداگانه و قابل لغو شما نیاز دارد.', Icons.shield_rounded, const Color(0xFFFFF3E8), const Color(0xFF94631A)),
         const SizedBox(height: 12),
-        SwitchListTile(contentPadding: EdgeInsets.zero, value: showConfidential, onChanged: (v) => setState(() => showConfidential = v), title: const Text('نمایش نمونه محرمانه'), subtitle: const Text('فقط نمایش ساختاری؛ فاقد داده واقعی')),
+        Material(
+          color: Colors.transparent,
+          child: SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: showConfidential,
+            onChanged: (v) => setState(() => showConfidential = v),
+            title: const Text('نمایش نمونه محرمانه'),
+            subtitle: const Text('فقط نمایش ساختاری؛ فاقد داده واقعی'),
+          ),
+        ),
         if(showConfidential) const Text('هیچ اطلاعات حساسی در نمونه ذخیره نشده است.', style: TextStyle(color: muted, fontSize: 12)),
       ])),
       _section('مجوزهای دسترسی'),
