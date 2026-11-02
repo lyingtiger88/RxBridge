@@ -263,7 +263,8 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
   );
   Widget _banner(String text, IconData icon, Color bg, Color fg) => Container(padding: const EdgeInsets.all(13), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(15)), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(icon, color: fg, size: 19), const SizedBox(width: 9), Expanded(child: Text(text, style: TextStyle(color: fg, fontSize: 11, height: 1.55)))]));
   Widget _doctorPage() {
-    if (tab == 1) return _wrap([
+    if (tab == 1) {
+      return _wrap([
       _heading('بیماران من', 'دسترسی به پرونده بیماران دارای رابطه درمانی مجاز'),
       TextField(controller: search, decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'جستجوی بیمار یا شناسه')),
       const SizedBox(height: 14),
@@ -274,7 +275,8 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       ])),
       const SizedBox(height: 14), _banner('این فهرست نمایشی است. در نسخه عملیاتی، فقط بیماران دارای رابطه درمانی فعال و مجوز معتبر نمایش داده می‌شوند.', Icons.lock_outline_rounded, const Color(0xFFEAF3F8), navy),
     ]);
-    if (tab == 2) return _wrap([
+    if (tab == 2) {
+      return _wrap([
       _heading('نسخه‌ها', 'مدیریت نسخه‌های ثبت‌شده و پیش‌نویس‌ها'),
       _card(child: Column(children: [
         _rowItem(Icons.description_rounded, 'نسخه پیش‌نویس #RX-001', '۲ قلم دارو • منتظر ثبت نهایی', trailing: const Chip(label: Text('پیش‌نویس'))),
@@ -283,7 +285,8 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       ])),
       const SizedBox(height: 14), FilledButton.icon(onPressed: () => _toast('فرم نسخه‌نویسی در مرحله بعد به این پنل متصل می‌شود.'), icon: const Icon(Icons.add_rounded), label: const Text('ایجاد نسخه جدید')),
     ]);
-    if (tab == 3) return _wrap([
+    if (tab == 3) {
+      return _wrap([
       _heading('پیام‌ها', 'گفت‌وگوی امن با بیماران تحت درمان'),
       _card(child: Column(children: [
         _rowItem(Icons.chat_bubble_outline_rounded, 'بیمار آزمایشی ۰۰۱', 'پیام جدید: پیگیری روند درمان', color: teal, trailing: const Text('۰۹:۳۰')),
@@ -317,7 +320,8 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
   }
 
   Widget _patientPage() {
-    if (tab == 1) return _wrap([
+    if (tab == 1) {
+      return _wrap([
       _heading('پرونده سلامت من', 'اطلاعات درمانی و سوابق ثبت‌شده'),
       _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('پرونده درمانی خصوصی', style: TextStyle(fontWeight: FontWeight.w900, color: navy, fontSize: 16)),
@@ -342,7 +346,8 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
         if(consentGranted != null) Text(consentGranted == 'granted' ? 'مجوز نمایشی فعال شد.' : 'مجوز نمایشی لغو شد.', style: const TextStyle(color: muted, fontSize: 11)),
       ])),
     ]);
-    if (tab == 2) return _wrap([
+    if (tab == 2) {
+      return _wrap([
       _heading('پزشک من', 'اطلاعات عمومی پزشک و تجربه دریافت خدمات'),
       _card(child: Column(children: [
         const CircleAvatar(radius: 34, backgroundColor: Color(0xFFE3F3F8), child: Icon(Icons.person_rounded, size: 38, color: navy)),
@@ -353,7 +358,8 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       ])),
       const SizedBox(height: 12), _banner('امتیازدهی عمومی در نسخه واقعی فقط برای مراجعه تأییدشده مجاز است؛ اطلاعات پزشکی شما هرگز در نظر عمومی نمایش داده نمی‌شود.', Icons.verified_user_rounded, const Color(0xFFEAF6F2), const Color(0xFF27745F)),
     ]);
-    if (tab == 3) return _wrap([
+    if (tab == 3) {
+      return _wrap([
       _heading('پیام به پزشک', 'برای پرسش‌های غیر اورژانسی درباره روند درمان'),
       _card(child: Column(children: [
         const Align(alignment: Alignment.centerRight, child: Text('گفت‌وگوی نمونه با پزشک معالج', style: TextStyle(fontWeight: FontWeight.w800, color: navy))),
@@ -388,7 +394,8 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
   }
 
   Widget _pharmacyPage() {
-    if (tab == 1) return _wrap([
+    if (tab == 1) {
+      return _wrap([
       _heading('نسخه‌های دریافتی', 'نسخه‌های ارجاع‌شده به داروخانه'),
       TextField(controller: search, decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'کد نسخه یا شناسه تست')),
       const SizedBox(height: 12),
@@ -397,7 +404,8 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
         const Divider(height: 1), _rowItem(Icons.receipt_long_rounded, 'نسخه #RX-TEST-023', '۲ قلم • تحویل ناقص', color: teal, trailing: const Icon(Icons.chevron_left_rounded)),
       ])),
     ]);
-    if (tab == 2) return _wrap([
+    if (tab == 2) {
+      return _wrap([
       _heading('موجودی داروخانه', 'مدیریت موجودی و اعلام کمبود'),
       TextField(controller: search, decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'جستجوی دارو')),
       const SizedBox(height: 12),
@@ -406,7 +414,8 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
         const Divider(height: 1), _rowItem(Icons.medication_rounded, 'فرآورده آزمایشی B', 'موجودی: ۰ بسته', color: const Color(0xFFC65B52), trailing: const Chip(label: Text('ناموجود'))),
       ])),
     ]);
-    if (tab == 3) return _wrap([
+    if (tab == 3) {
+      return _wrap([
       _heading('تحویل دارو', 'ثبت وضعیت هر قلم نسخه'),
       _card(child: Column(children: [
         _rowItem(Icons.medication_rounded, 'فرآورده آزمایشی A', 'نسخه #RX-TEST-024 • تعداد ۱', color: teal),
@@ -437,7 +446,8 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
   }
 
   Widget _insurancePage() {
-    if (tab == 1) return _wrap([
+    if (tab == 1) {
+      return _wrap([
       _heading('گزارش‌های آماری', 'گزارش‌های تجمیعی و فاقد اطلاعات هویتی'),
       _card(child: Column(children: [
         _rowItem(Icons.calendar_month_rounded, 'گزارش ماهانه', 'تعداد نسخه‌ها و اقلام تحویلی'),
@@ -446,14 +456,16 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       ])),
       const SizedBox(height: 12), _banner('گزارش‌ها در این نسخه ساختگی‌اند. دسترسی بیمه به پرونده تفصیلی یا محرمانه بیمار وجود ندارد.', Icons.lock_outline_rounded, const Color(0xFFEAF3F8), navy),
     ]);
-    if (tab == 2) return _wrap([
+    if (tab == 2) {
+      return _wrap([
       _heading('خدمات تحت پوشش', 'نمایش ساختار نمونه خدمات بیمه'),
       _card(child: Column(children: [
         _rowItem(Icons.medication_rounded, 'داروهای مشمول', 'کاتالوگ و قواعد پوشش باید از منبع مجاز دریافت شود'),
         const Divider(height: 1), _rowItem(Icons.science_rounded, 'آزمایش و تصویربرداری', 'تعرفه و پوشش نیازمند اتصال رسمی'),
       ])),
     ]);
-    if (tab == 3) return _wrap([
+    if (tab == 3) {
+      return _wrap([
       _heading('حساب کاربری', 'نقش سازمانی و تنظیمات دسترسی'),
       _card(child: Column(children: [
         _rowItem(Icons.business_rounded, 'سازمان بیمه نمونه', 'حساب آزمایشی'),
