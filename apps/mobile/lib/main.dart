@@ -275,6 +275,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       ])),
       const SizedBox(height: 14), _banner('این فهرست نمایشی است. در نسخه عملیاتی، فقط بیماران دارای رابطه درمانی فعال و مجوز معتبر نمایش داده می‌شوند.', Icons.lock_outline_rounded, const Color(0xFFEAF3F8), navy),
     ]);
+    }
     if (tab == 2) {
       return _wrap([
       _heading('نسخه‌ها', 'مدیریت نسخه‌های ثبت‌شده و پیش‌نویس‌ها'),
@@ -285,6 +286,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       ])),
       const SizedBox(height: 14), FilledButton.icon(onPressed: () => _toast('فرم نسخه‌نویسی در مرحله بعد به این پنل متصل می‌شود.'), icon: const Icon(Icons.add_rounded), label: const Text('ایجاد نسخه جدید')),
     ]);
+    }
     if (tab == 3) {
       return _wrap([
       _heading('پیام‌ها', 'گفت‌وگوی امن با بیماران تحت درمان'),
@@ -296,6 +298,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       ])),
       const SizedBox(height: 12), _banner('پیام‌رسانی واقعی، زمان پاسخ‌گویی و حفاظت از پیوست‌ها به Backend امن نیاز دارد و جایگزین خدمات اورژانسی نیست.', Icons.info_outline_rounded, const Color(0xFFFFF5E6), const Color(0xFF94631A)),
     ]);
+    }
     return _wrap([
       _heading('صبح بخیر، پزشک', 'نمای کلی فعالیت حرفه‌ای شما در RxBridge'),
       _card(child: Row(children: [
@@ -346,6 +349,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
         if(consentGranted != null) Text(consentGranted == 'granted' ? 'مجوز نمایشی فعال شد.' : 'مجوز نمایشی لغو شد.', style: const TextStyle(color: muted, fontSize: 11)),
       ])),
     ]);
+    }
     if (tab == 2) {
       return _wrap([
       _heading('پزشک من', 'اطلاعات عمومی پزشک و تجربه دریافت خدمات'),
@@ -358,6 +362,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       ])),
       const SizedBox(height: 12), _banner('امتیازدهی عمومی در نسخه واقعی فقط برای مراجعه تأییدشده مجاز است؛ اطلاعات پزشکی شما هرگز در نظر عمومی نمایش داده نمی‌شود.', Icons.verified_user_rounded, const Color(0xFFEAF6F2), const Color(0xFF27745F)),
     ]);
+    }
     if (tab == 3) {
       return _wrap([
       _heading('پیام به پزشک', 'برای پرسش‌های غیر اورژانسی درباره روند درمان'),
@@ -370,6 +375,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       ])),
       const SizedBox(height: 12), _banner('این محیط پیام‌رسانی آزمایشی است و برای موارد اورژانسی طراحی نشده است.', Icons.info_outline_rounded, const Color(0xFFFFF5E6), const Color(0xFF94631A)),
     ]);
+    }
     return _wrap([
       _heading('سلام، خوش آمدید', 'سلامت شما؛ در یک نگاه'),
       _card(child: Row(children: [
@@ -404,6 +410,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
         const Divider(height: 1), _rowItem(Icons.receipt_long_rounded, 'نسخه #RX-TEST-023', '۲ قلم • تحویل ناقص', color: teal, trailing: const Icon(Icons.chevron_left_rounded)),
       ])),
     ]);
+    }
     if (tab == 2) {
       return _wrap([
       _heading('موجودی داروخانه', 'مدیریت موجودی و اعلام کمبود'),
@@ -414,6 +421,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
         const Divider(height: 1), _rowItem(Icons.medication_rounded, 'فرآورده آزمایشی B', 'موجودی: ۰ بسته', color: const Color(0xFFC65B52), trailing: const Chip(label: Text('ناموجود'))),
       ])),
     ]);
+    }
     if (tab == 3) {
       return _wrap([
       _heading('تحویل دارو', 'ثبت وضعیت هر قلم نسخه'),
@@ -428,6 +436,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
         FilledButton.tonalIcon(onPressed: () => _toast('اعلان کمبود برای بیمار ثبت شد (نمایشی).'), icon: const Icon(Icons.notifications_active_rounded), label: const Text('اعلام ناموجودی به بیمار')),
       ])),
     ]);
+    }
     return _wrap([
       _heading('داشبورد داروخانه', 'مدیریت نسخه و تأمین دارو'),
       Row(children: [_stat('نسخه ورودی', '۱۸', Icons.receipt_long_rounded, const Color(0xFFE3F3F8)), const SizedBox(width: 10), _stat('کمبود موجودی', '۰۳', Icons.warning_amber_rounded, const Color(0xFFFFF2E5))]),
@@ -456,6 +465,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       ])),
       const SizedBox(height: 12), _banner('گزارش‌ها در این نسخه ساختگی‌اند. دسترسی بیمه به پرونده تفصیلی یا محرمانه بیمار وجود ندارد.', Icons.lock_outline_rounded, const Color(0xFFEAF3F8), navy),
     ]);
+    }
     if (tab == 2) {
       return _wrap([
       _heading('خدمات تحت پوشش', 'نمایش ساختار نمونه خدمات بیمه'),
@@ -464,6 +474,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
         const Divider(height: 1), _rowItem(Icons.science_rounded, 'آزمایش و تصویربرداری', 'تعرفه و پوشش نیازمند اتصال رسمی'),
       ])),
     ]);
+    }
     if (tab == 3) {
       return _wrap([
       _heading('حساب کاربری', 'نقش سازمانی و تنظیمات دسترسی'),
@@ -472,6 +483,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
         const Divider(height: 1), _rowItem(Icons.security_rounded, 'سطح دسترسی', 'گزارش‌های تجمیعی مجاز'),
       ])),
     ]);
+    }
     return _wrap([
       _heading('داشبورد بیمه', 'نمای کلی عملکرد در سطح تجمیعی'),
       Row(children: [_stat('نسخه‌های نمونه', '۱٬۲۸۰', Icons.receipt_long_rounded, const Color(0xFFE3F3F8)), const SizedBox(width: 10), _stat('داروخانه‌ها', '۴۸', Icons.local_pharmacy_rounded, const Color(0xFFE7F5F0))]),
