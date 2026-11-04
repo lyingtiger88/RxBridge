@@ -24,6 +24,8 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+if len(settings.jwt_secret) < 32 or settings.jwt_secret == "CHANGE_ME_BEFORE_STARTING":
+    raise RuntimeError("JWT_SECRET must be a unique random secret of at least 32 characters")
 app = FastAPI(title="RxBridge Staging API", version="0.1.0")
 oauth2 = OAuth2PasswordBearer(tokenUrl="/v1/auth/token")
 hasher = PasswordHasher()
