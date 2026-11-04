@@ -74,6 +74,22 @@ Private identity documents, personal address/phone, disciplinary material not le
 - Push notifications must be privacy-preserving (e.g. “New message” rather than diagnosis or medicine name).
 - Provide clear emergency guidance and prohibit the interface from implying continuous monitoring unless staffed and contracted.
 
+
+
+### 5.1 Patient medication reminders (planned)
+Medication reminders are a patient-support feature, not a prescribing or clinical decision engine.
+
+- Create reminders only from an authenticated, valid prescription or from a patient-entered medicine record that is clearly marked as unverified and is not represented as a clinician's instruction.
+- When generated from a prescription, use the prescribed dose, route, frequency, timing instructions, start/end dates and any food-related instruction exactly as recorded. Never calculate, infer, optimize or change a dose or schedule.
+- If the prescription lacks a usable schedule, contains conflicting instructions, has expired, or has been discontinued, do not invent a schedule; ask the patient to contact the prescriber/pharmacist.
+- Show medicine name, prescribed amount and route, scheduled time, course dates and the source prescription. Let the patient mark a dose as taken, missed, skipped under clinician advice, or snoozed; retain a timestamped history.
+- A patient must not be able to mark a dose as taken automatically. A reminder is not proof of ingestion and adherence history must be labelled patient-reported.
+- Changes, pauses or discontinuation must follow an updated authorized prescription or an explicitly recorded instruction from the responsible clinician. The app must not recommend doubling a later dose after a missed dose.
+- Prevent duplicate active reminders for the same prescription instruction and handle time-zone changes without silently shifting the prescribed schedule.
+- Notifications must be privacy-preserving by default and require device permission. Patients can pause or disable notifications without altering the prescription itself.
+- Include clear wording that reminders are not emergency monitoring, do not replace professional advice, and may be delayed or suppressed by device power-saving settings.
+- Use synthetic data in prototypes. Production requires authenticated identity, server-side authorization, audit events, secure synchronization, consent, retention rules and clinical safety review.
+
 ## 6. Consent and access-control model
 Consent is a first-class, versioned domain object, not a boolean:
 - subject/patient;
@@ -133,7 +149,7 @@ Sources:
 5. **Sensitive compartment:** separate storage/key boundary, explicit consent and denial tests.
 6. **Messaging/follow-up:** secure care-team communication and privacy-safe notifications.
 7. **Ratings:** verified-encounter review, moderation, appeal and anti-fraud.
-8. **Integration and release:** authorized national operator, insurer/pharmacy integration, security/clinical/legal review.
+8. **Medication reminders:** prescription-linked schedule display, patient-reported dose status, privacy-safe notifications and safety tests; no autonomous dose/schedule decisions.\n9. **Integration and release:** authorized national operator, insurer/pharmacy integration, security/clinical/legal review.
 
 ## 11. Acceptance criteria (non-negotiable)
 - A pharmacist cannot access a patient's chart by changing a client-side role.
@@ -143,5 +159,5 @@ Sources:
 - Revoking consent blocks subsequent access and creates an audit event.
 - Patient can see all access events and manage grants.
 - Public clinician profile never exposes patient or private credential data.
-- CI tests prove both allowed and denied access paths.
+- CI tests prove both allowed and denied access paths.\n- Medication reminders reproduce prescription instructions exactly, never infer or alter a dose, and label adherence as patient-reported.
 - All demo fixtures are synthetic and visibly labelled.
