@@ -13,7 +13,23 @@ CREATE TABLE IF NOT EXISTS demo_lab_orders (
  test_name TEXT NOT NULL, scheduled_at TIMESTAMPTZ NOT NULL,
  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','reported','cancelled'))
 );
-CREATE TABLE IF NOT EXISTS demo_glucose_readings (
+
+CREATE TABLE IF NOT EXISTS demo_lab_results (
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_id UUID NOT NULL REFERENCES demo_lab_orders(id),
+ result_text TEXT NOT NULL, units TEXT, detailed_report TEXT NOT NULL DEFAULT '',
+ reported_by UUID NOT NULL REFERENCES app_users(id), reported_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS demo_glucose_schedules (
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(), patient_id UUID NOT NULL REFERENCES demo_patients(id),
+ times_local TEXT[] NOT NULL, timezone TEXT NOT NULL DEFAULT 'Asia/Tehran',
+ set_by UUID NOT NULL REFERENCES app_users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS demo_prescriptions (
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(), patient_id UUID NOT NULL REFERENCES demo_patients(id),
+ doctor_id UUID NOT NULL REFERENCES app_users(id), status TEXT NOT NULL DEFAULT 'draft',
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+\nCREATE TABLE IF NOT EXISTS demo_glucose_readings (
  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), patient_id UUID NOT NULL REFERENCES demo_patients(id),
  value_mg_dl INTEGER NOT NULL CHECK(value_mg_dl BETWEEN 1 AND 1000),
  measured_at TIMESTAMPTZ NOT NULL, context TEXT NOT NULL,
