@@ -1,0 +1,24 @@
+name: Server CI
+on:
+  push:
+    paths:
+      - 'server/**'
+      - '.github/workflows/server-ci.yml'
+  pull_request:
+    paths:
+      - 'server/**'
+      - '.github/workflows/server-ci.yml'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile Python modules
+        run: python -m compileall -q server/app server
+      - name: Validate Compose configuration
+        run: docker compose -f server/docker-compose.yml config --quiet
+      - name: Build backend image
+        run: docker build -t rxbridge-staging-api server
