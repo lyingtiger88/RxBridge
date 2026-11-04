@@ -51,7 +51,7 @@ class CareReminders {
       var next=tz.TZDateTime(tz.local,now.year,now.month,now.day,time.hour,time.minute);
       if(!next.isAfter(now)) next=tz.TZDateTime(tz.local,now.year,now.month,now.day+1,time.hour,time.minute);
       await plugin.zonedSchedule(
-        firstId+i,
+        id: firstId+i,
         title:'یادآوری پل سلامت',
         body:'زمان ثبت اندازه‌گیری برنامه‌ریزی‌شده فرا رسیده است.',
         scheduledDate: next,
