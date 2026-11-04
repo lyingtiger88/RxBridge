@@ -39,6 +39,8 @@ class GlucoseReading {
 /// Shared only while the app process stays alive. No API or durable persistence.
 class CareDemoStore extends ChangeNotifier {
   CareDemoStore._();
+  @visibleForTesting
+  CareDemoStore.forTesting();
   static final CareDemoStore instance = CareDemoStore._();
 
   CareSnapshotStorage? _storage;
