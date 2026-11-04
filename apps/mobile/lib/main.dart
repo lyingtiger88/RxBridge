@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'care_pages.dart';
 
 void main() => runApp(const RxBridgeApp());
 
@@ -9,7 +10,7 @@ const canvas = Color(0xFFF3F7FA);
 const ink = Color(0xFF183247);
 const muted = Color(0xFF6C8293);
 
-enum AppRole { doctor, patient, pharmacy, insurance }
+enum AppRole { doctor, patient, pharmacy, insurance, laboratory }
 
 extension AppRoleInfo on AppRole {
   String get title => switch (this) {
@@ -17,24 +18,28 @@ extension AppRoleInfo on AppRole {
     AppRole.patient => 'بیمار',
     AppRole.pharmacy => 'داروساز',
     AppRole.insurance => 'مسئول بیمه',
+    AppRole.laboratory => 'آزمایشگاه',
   };
   String get subtitle => switch (this) {
     AppRole.doctor => 'مدیریت بیماران، نسخه و پیگیری درمان',
     AppRole.patient => 'پرونده سلامت، پزشک و روند درمان',
     AppRole.pharmacy => 'نسخه‌های ورودی، موجودی و تحویل دارو',
     AppRole.insurance => 'گزارش‌ها و آمار خدمات بیمه‌ای',
+    AppRole.laboratory => 'دریافت درخواست و ارسال گزارش آزمایش',
   };
   IconData get icon => switch (this) {
     AppRole.doctor => Icons.medical_services_rounded,
     AppRole.patient => Icons.person_rounded,
     AppRole.pharmacy => Icons.local_pharmacy_rounded,
     AppRole.insurance => Icons.health_and_safety_rounded,
+    AppRole.laboratory => Icons.science_rounded,
   };
   Color get tint => switch (this) {
     AppRole.doctor => const Color(0xFFE3F3F8),
     AppRole.patient => const Color(0xFFE7F5F0),
     AppRole.pharmacy => const Color(0xFFFFF2E5),
     AppRole.insurance => const Color(0xFFEDEBFA),
+    AppRole.laboratory => const Color(0xFFE6F2FF),
   };
 }
 
@@ -180,26 +185,30 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
   }
 
   List<_NavItem> get nav => switch (widget.role) {
-    AppRole.doctor => const [_NavItem('خانه', Icons.grid_view_rounded), _NavItem('بیماران', Icons.people_alt_rounded), _NavItem('نسخه‌ها', Icons.receipt_long_rounded), _NavItem('پیام‌ها', Icons.chat_bubble_outline_rounded)],
-    AppRole.patient => const [_NavItem('خانه', Icons.home_rounded), _NavItem('پرونده من', Icons.folder_shared_rounded), _NavItem('پزشک من', Icons.medical_services_rounded), _NavItem('پیام‌ها', Icons.chat_bubble_outline_rounded)],
+    AppRole.doctor => const [_NavItem('خانه', Icons.grid_view_rounded), _NavItem('بیماران', Icons.people_alt_rounded), _NavItem('نسخه‌ها', Icons.receipt_long_rounded), _NavItem('پیام‌ها', Icons.chat_bubble_outline_rounded), _NavItem('آزمایش‌ها', Icons.science_rounded)],
+    AppRole.patient => const [_NavItem('خانه', Icons.home_rounded), _NavItem('پرونده من', Icons.folder_shared_rounded), _NavItem('پزشک من', Icons.medical_services_rounded), _NavItem('پیام‌ها', Icons.chat_bubble_outline_rounded), _NavItem('قند و آزمایش', Icons.bloodtype_outlined)],
     AppRole.pharmacy => const [_NavItem('خانه', Icons.grid_view_rounded), _NavItem('نسخه‌ها', Icons.receipt_long_rounded), _NavItem('موجودی', Icons.inventory_2_rounded), _NavItem('تحویل', Icons.local_shipping_rounded)],
     AppRole.insurance => const [_NavItem('خانه', Icons.grid_view_rounded), _NavItem('گزارش‌ها', Icons.analytics_rounded), _NavItem('خدمات', Icons.health_and_safety_rounded), _NavItem('حساب', Icons.account_circle_rounded)],
+    AppRole.laboratory => const [_NavItem('آزمایشگاه', Icons.science_rounded), _NavItem('درخواست‌ها', Icons.assignment_rounded)],
   };
 
   String get heading => switch ((widget.role, tab)) {
     (AppRole.doctor, 0) => 'داشبورد پزشک',
     (AppRole.doctor, 1) => 'بیماران من',
     (AppRole.doctor, 2) => 'مدیریت نسخه‌ها',
+    (AppRole.doctor, 4) => 'آزمایش‌ها و پایش',
     (AppRole.doctor, _) => 'پیام‌های بیماران',
     (AppRole.patient, 0) => 'سلام، خوش آمدید',
     (AppRole.patient, 1) => 'پرونده سلامت من',
     (AppRole.patient, 2) => 'پزشک من',
+    (AppRole.patient, 4) => 'قند خون و آزمایش',
     (AppRole.patient, _) => 'ارتباط با پزشک',
     (AppRole.pharmacy, 0) => 'داشبورد داروخانه',
     (AppRole.pharmacy, 1) => 'نسخه‌های دریافتی',
     (AppRole.pharmacy, 2) => 'مدیریت موجودی',
     (AppRole.pharmacy, _) => 'تحویل دارو',
     (AppRole.insurance, 0) => 'داشبورد بیمه',
+    (AppRole.laboratory, _) => 'پنل آزمایشگاه',
     (AppRole.insurance, 1) => 'گزارش‌های آماری',
     (AppRole.insurance, 2) => 'خدمات تحت پوشش',
     _ => 'حساب کاربری',
@@ -229,6 +238,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
     AppRole.patient => _patientPage(),
     AppRole.pharmacy => _pharmacyPage(),
     AppRole.insurance => _insurancePage(),
+    AppRole.laboratory => const LaboratoryPage(),
   };
 
   Widget _wrap(List<Widget> children) => ListView(padding: const EdgeInsets.fromLTRB(18, 12, 18, 26), children: children);
@@ -268,6 +278,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
   );
   Widget _banner(String text, IconData icon, Color bg, Color fg) => Container(padding: const EdgeInsets.all(13), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(15)), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(icon, color: fg, size: 19), const SizedBox(width: 9), Expanded(child: Text(text, style: TextStyle(color: fg, fontSize: 11, height: 1.55)))]));
   Widget _doctorPage() {
+    if (tab == 4) { return const CareTrackingPage(clinician: true); }
     if (tab == 1) {
       return _wrap([
       _heading('بیماران من', 'دسترسی به پرونده بیماران دارای رابطه درمانی مجاز'),
@@ -315,6 +326,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       Row(children: [_stat('بیماران فعال', '۲۴', Icons.people_alt_rounded, const Color(0xFFE3F3F8)), const SizedBox(width: 10), _stat('نسخه امروز', '۰۸', Icons.receipt_long_rounded, const Color(0xFFE7F5F0))]),
       _section('دسترسی سریع'),
       Wrap(spacing: 9, runSpacing: 9, children: [
+        _action('برنامه آزمایش‌ها', Icons.science_outlined, () => setState(() => tab = 4)),
         _action('پرونده بیماران', Icons.folder_shared_rounded, () => setState(() => tab = 1)),
         _action('نسخه جدید', Icons.add_box_rounded, () => setState(() => tab = 2)),
         _action('پیام‌ها', Icons.chat_rounded, () => setState(() => tab = 3)),
@@ -328,6 +340,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
   }
 
   Widget _patientPage() {
+    if (tab == 4) { return const CareTrackingPage(clinician: false); }
     if (tab == 1) {
       return _wrap([
       _heading('پرونده سلامت من', 'اطلاعات درمانی و سوابق ثبت‌شده'),
@@ -401,6 +414,7 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       Row(children: [_stat('نسخه فعال', '۰۱', Icons.medication_rounded, const Color(0xFFE7F5F0)), const SizedBox(width: 10), _stat('نتیجه جدید', '۰۲', Icons.science_rounded, const Color(0xFFE3F3F8))]),
       _section('دسترسی سریع'),
       Wrap(spacing: 8, runSpacing: 8, children: [
+        _action('قند خون و آزمایش', Icons.bloodtype_rounded, () => setState(() => tab = 4)),
         _action('پرونده من', Icons.folder_shared_rounded, () => setState(() => tab = 1)),
         _action('پزشک من', Icons.medical_services_rounded, () => setState(() => tab = 2)),
         _action('پیام‌ها', Icons.chat_rounded, () => setState(() => tab = 3)),
