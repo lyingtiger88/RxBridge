@@ -62,6 +62,7 @@ jobs:
           PY
           test -f apps/mobile/lib/main.dart
           test -f apps/mobile/test/widget_test.dart
+          python3 apps/mobile/tool/configure_notifications.py
           cd apps/mobile
           flutter pub get
           flutter analyze
@@ -105,6 +106,7 @@ jobs:
           with plist_path.open("wb") as target:
               plistlib.dump(info, target)
           PY
+          python3 apps/mobile/tool/configure_notifications.py
           cd apps/mobile
           flutter pub get
           flutter analyze
