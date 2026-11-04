@@ -20,6 +20,7 @@ class _CareTrackingPageState extends State<CareTrackingPage> {
   final testInput = TextEditingController();
   final noteInput = TextEditingController();
   DateTime dueAt = DateTime.now().add(const Duration(days: 7));
+  TimeOfDay labDueTime = const TimeOfDay(hour: 8, minute: 0);
   String glucoseContext = 'پیش از غذا';
   int frequency = 2;
   int startHour = 8;
@@ -112,10 +113,15 @@ class _CareTrackingPageState extends State<CareTrackingPage> {
       if(selected != null) setState(() => dueAt=selected);
     }, icon:const Icon(Icons.calendar_today_rounded),
       label:Text('موعد آزمایش: ${dueAt.year}/${dueAt.month}/${dueAt.day}')),
+    OutlinedButton.icon(onPressed: () async {
+      final selected = await showTimePicker(context:context, initialTime:labDueTime);
+      if(selected != null) setState(() => labDueTime=selected);
+    }, icon:const Icon(Icons.access_time_rounded),label:Text('ساعت مراجعه: ${clockLabel(labDueTime)}')),
     const SizedBox(height: 8),
     FilledButton.icon(onPressed: () {
       try {
-        store.addOrder(testInput.text,dueAt,noteInput.text);
+        final dueDateTime=DateTime(dueAt.year,dueAt.month,dueAt.day,labDueTime.hour,labDueTime.minute);
+        store.addOrder(testInput.text,dueDateTime,noteInput.text);
         testInput.clear();noteInput.clear();
         notice('درخواست آزمایش برای بیمار نمونه ثبت شد.');
       } catch (_) {notice('نام یا تاریخ آزمایش معتبر نیست.');}
@@ -175,7 +181,7 @@ class _CareTrackingPageState extends State<CareTrackingPage> {
       ListTile(contentPadding:EdgeInsets.zero,
         leading:Icon(order.completed?Icons.fact_check_outlined:Icons.pending_actions_rounded,color:order.completed?_teal:_navy),
         title:Text(order.testName,style:const TextStyle(fontWeight:FontWeight.w700,fontSize:13)),
-        subtitle:Text(order.completed?'گزارش: ${order.result} ${order.units??''}\nیادداشت آزمایشگاه: ${order.laboratoryNote??'—'}':'موعد: ${order.dueAt.year}/${order.dueAt.month}/${order.dueAt.day}\n${order.clinicianNote}',style:const TextStyle(fontSize:11)),
+        subtitle:Text(order.completed?'گزارش: ${order.result} ${order.units??''}\nیادداشت آزمایشگاه: ${order.laboratoryNote??'—'}':'موعد: ${order.dueAt.year}/${order.dueAt.month}/${order.dueAt.day} ساعت ${order.dueAt.hour.toString().padLeft(2,'0')}:${order.dueAt.minute.toString().padLeft(2,'0')}\n${order.clinicianNote}',style:const TextStyle(fontSize:11)),
         isThreeLine: true,
       ),
       const Divider(height:5),
