@@ -1,8 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'care_pages.dart';
+import 'care_demo_store.dart';
+import 'care_storage.dart';
 
-void main() => runApp(const RxBridgeApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    final storage = await SqliteCareSnapshotStorage.open();
+    await CareDemoStore.instance.attachStorage(storage);
+  } catch (error) {
+    // Persistence failure must remain visible in the UI; the test prototype
+    // can still run with explicitly marked volatile demo data.
+    demoStorageFailure = true;
+    debugPrint('Demo SQLite could not initialize: $error');
+  }
+  runApp(const RxBridgeApp());
+}
+
+bool demoStorageFailure = false;
 
 const navy = Color(0xFF102A43);
 const teal = Color(0xFF16A6A1);
@@ -119,6 +135,11 @@ class RoleSelectionPage extends StatelessWidget {
           const SizedBox(height: 12),
         ],
         const SizedBox(height: 10),
+        if (demoStorageFailure) const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: Text('هشدار: پایگاه داده آزمایشی فعال نشد؛ اطلاعات این اجرا ذخیره نمی‌شوند.',
+            style: TextStyle(color: Color(0xFF9A2D26), fontWeight: FontWeight.bold)),
+        ),
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(color: const Color(0xFFFFF6E8), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFF4E5C9))),
