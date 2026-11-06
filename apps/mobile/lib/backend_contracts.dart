@@ -2,7 +2,7 @@
 /// Implementations may use Supabase now or an Iranian REST API later.
 /// UI widgets must depend on these contracts, never on a vendor SDK.
 abstract interface class AuthRepository {
-  Future<SessionUser> signIn({required String username, required String password});
+  Future<SessionUser> signIn({required String email, required String password});
   Future<void> signOut();
   Future<SessionUser?> currentUser();
 }
