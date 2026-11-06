@@ -443,7 +443,13 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
         const SizedBox(height: 12),
         _rowItem(Icons.medical_information_rounded, 'سوابق ویزیت', '۳ مراجعه ثبت‌شده'),
         const Divider(height: 1), _rowItem(Icons.science_rounded, 'آزمایش‌ها', '۲ گزارش آزمایشگاهی'),
-        const Divider(height: 1), _rowItem(Icons.medication_rounded, 'داروها و نسخه‌ها', '۱ نسخه فعال'),
+        const Divider(height: 1), _rowItem(Icons.medication_rounded, 'داروها و نسخه‌ها', '${DemoPrescriptionStore.instance.prescriptions.length} نسخه نمایشی'),
+        for (final p in DemoPrescriptionStore.instance.prescriptions.where((p) => p.patientName == 'بیمار نمونه ۰۰۱'))
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Text('${p.medicine} • ${p.frequency} • ${p.available ? 'موجود' : 'ناموجود در داروخانه'}',
+                style: const TextStyle(fontSize: 12, color: navy)),
+          ),
         const Divider(height: 1), _rowItem(Icons.monitor_heart_rounded, 'تشخیص‌ها و روند درمان', 'نمایش تاریخچه'),
       ])),
       _section('بخش محرمانه'),
@@ -562,16 +568,17 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       return _wrap([
       _heading('تحویل دارو', 'ثبت وضعیت هر قلم نسخه'),
       _card(child: Column(children: [
-        _rowItem(Icons.medication_rounded, 'فرآورده آزمایشی A', 'نسخه #RX-TEST-024 • تعداد ۱', color: teal),
-        Wrap(spacing: 8, children: [
-          OutlinedButton(onPressed: () => _toast('تحویل کامل (نمایشی) ثبت شد.'), child: const Text('تحویل شد')),
-          OutlinedButton(onPressed: () => _toast('ناموجودی به بیمار اعلام شد (نمایشی).'), child: const Text('ناموجود')),
-        ]),
-        const Divider(height: 24),
-        _rowItem(Icons.medication_rounded, 'فرآورده آزمایشی B', 'نسخه #RX-TEST-024 • تعداد ۱', color: const Color(0xFFC65B52)),
-        FilledButton.tonalIcon(onPressed: () => _toast('اعلان کمبود برای بیمار ثبت شد (نمایشی).'), icon: const Icon(Icons.notifications_active_rounded), label: const Text('اعلام ناموجودی به بیمار')),
-      ])),
-    ]);
+        for (final p in DemoPrescriptionStore.instance.prescriptions) ...[
+          _rowItem(Icons.medication_rounded, p.medicine,
+            '${p.id} • تعداد ${p.quantity} • ${p.instructions}',
+            color: p.available ? teal : const Color(0xFFC65B52)),
+          Wrap(spacing: 8, children: [
+            OutlinedButton(onPressed: () => DemoPrescriptionStore.instance.setAvailability(p.id, true), child: const Text('تحویل شد')),
+            FilledButton.tonal(onPressed: () => DemoPrescriptionStore.instance.setAvailability(p.id, false), child: const Text('اعلام ناموجودی')),
+          ]),
+          const Divider(height: 24),
+        ],
+      ])),    ]);
     }
     return _wrap([
       _heading('داشبورد داروخانه', 'مدیریت نسخه و تأمین دارو'),
