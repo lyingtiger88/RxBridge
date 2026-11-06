@@ -15,6 +15,14 @@ python3 -m http.server 8080
 - نام نمایشی فارسی برنامه در صفحه شروع، نوار بالایی و خروجی Android/iOS: **پل سلامت**.
 - نام فنی و شناسه پروژه برای سازگاری مخزن و توسعه بین‌المللی: `RxBridge`.
 
+## Supabase staging adapter (initial implementation)
+- Added a provider-specific adapter behind the vendor-neutral contracts: `apps/mobile/lib/supabase_backend.dart`.
+- Added composition root `backend_factory.dart`; Supabase initializes only when explicitly selected. Local SQLite is opened only in `localDemo` mode. Selecting an unimplemented Iranian backend fails closed rather than silently falling back.
+- Added initial PostgreSQL schema and deny-by-default RLS policies in `infra/supabase/migrations/0001_staging_core.sql`.
+- Added setup guide: `docs/SUPABASE_STAGING_SETUP.md`.
+- Current adapter supports authentication, patient reads, lab-order reads/writes and glucose-reading reads/writes. Existing UI screens are **not yet wired** to these repositories, so cloud sync is not yet complete.
+- Never put Supabase `service_role` keys in the mobile/web client. Use only project URL + anon/publishable key. Staging must contain synthetic data only.
+
 ## معماری قابل‌انتقال بین Supabase و سرور ایرانی
 - از این مرحله، قراردادهای مستقل از ارائه‌دهنده در `apps/mobile/lib/backend_contracts.dart` تعریف شده‌اند؛ صفحات نباید مستقیماً به SDK یا API اختصاصی Supabase وابسته شوند.
 - انتخاب محیط به‌صورت صریح و زمان بیلد است: `RXBRIDGE_BACKEND=localDemo|supabaseStaging|iranianServer`. تنظیمات عمومی موردنیاز هر محیط نیز اعتبارسنجی می‌شوند.
