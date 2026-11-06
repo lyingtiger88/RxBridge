@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'care_pages.dart';
 import 'care_demo_store.dart';
+import 'prescription_demo_store.dart';
 import 'sqlite_care_storage.dart';
 import 'backend_factory.dart';
 import 'backend_config.dart';
@@ -204,7 +205,16 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
   final noteController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    DemoPrescriptionStore.instance.addListener(_prescriptionsChanged);
+  }
+
+  void _prescriptionsChanged() { if (mounted) setState(() {}); }
+
+  @override
   void dispose() {
+    DemoPrescriptionStore.instance.removeListener(_prescriptionsChanged);
     search.dispose(); messageController.dispose(); drugController.dispose(); noteController.dispose();
     super.dispose();
   }
@@ -302,6 +312,60 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
     ),
   );
   Widget _banner(String text, IconData icon, Color bg, Color fg) => Container(padding: const EdgeInsets.all(13), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(15)), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(icon, color: fg, size: 19), const SizedBox(width: 9), Expanded(child: Text(text, style: TextStyle(color: fg, fontSize: 11, height: 1.55)))]));
+
+  Future<void> _createDemoPrescription() async {
+    final medicine = TextEditingController();
+    final dose = TextEditingController(text: '۵۰۰ میلی‌گرم');
+    final duration = TextEditingController(text: '۳ روز');
+    final quantity = TextEditingController(text: '۶');
+    final instructions = TextEditingController(text: 'پس از غذا');
+    String form = 'قرص';
+    String frequency = 'هر ۱۲ ساعت';
+    try {
+      final accepted = await showDialog<bool>(context: context, builder: (ctx) => StatefulBuilder(
+        builder: (ctx, refresh) => AlertDialog(
+          title: const Text('نسخه نمایشی جدید'),
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: medicine, decoration: const InputDecoration(labelText: 'نام دارو (ساختگی/آزمایشی)')),
+            const SizedBox(height: 9),
+            DropdownButtonFormField<String>(value: form, decoration: const InputDecoration(labelText: 'شکل دارویی'),
+              items: ['قرص','کپسول','شربت','آمپول','شیاف','قطره','سایر'].map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),
+              onChanged: (v) { if(v!=null) refresh(()=>form=v); }),
+            const SizedBox(height: 9),
+            TextField(controller: dose, decoration: const InputDecoration(labelText: 'مقدار هر نوبت')),
+            const SizedBox(height: 9),
+            DropdownButtonFormField<String>(value: frequency, decoration: const InputDecoration(labelText: 'فاصله مصرف (نمایشی)'),
+              items: ['هر ۴ ساعت','هر ۶ ساعت','هر ۸ ساعت','هر ۱۲ ساعت','روزانه','طبق دستور پزشک'].map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),
+              onChanged: (v) { if(v!=null) refresh(()=>frequency=v); }),
+            const SizedBox(height: 9),
+            TextField(controller: duration, decoration: const InputDecoration(labelText: 'مدت نمونه')),
+            const SizedBox(height: 9),
+            TextField(controller: quantity, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'تعداد')),
+            const SizedBox(height: 9),
+            TextField(controller: instructions, decoration: const InputDecoration(labelText: 'توضیحات مصرف')),
+            const SizedBox(height: 8),
+            const Text('این فرم فقط برای نمایش گردش کار است و هیچ توصیه یا محاسبه درمانی ارائه نمی‌کند.', style: TextStyle(fontSize: 11, color: muted)),
+          ])),
+          actions: [
+            TextButton(onPressed: ()=>Navigator.pop(ctx,false), child: const Text('انصراف')),
+            FilledButton(onPressed: ()=>Navigator.pop(ctx,true), child: const Text('ثبت و ارسال به داروخانه')),
+          ],
+        ),
+      ));
+      if (accepted != true || !mounted) return;
+      DemoPrescriptionStore.instance.add(
+        medicine: medicine.text, form: form, dose: dose.text, frequency: frequency,
+        duration: duration.text, quantity: int.tryParse(quantity.text) ?? 0,
+        instructions: instructions.text,
+      );
+      _toast('نسخه نمایشی ثبت شد و در پنل داروخانه قابل مشاهده است.');
+    } catch (_) {
+      _toast('اطلاعات نسخه کامل یا معتبر نیست.');
+    } finally {
+      medicine.dispose(); dose.dispose(); duration.dispose(); quantity.dispose(); instructions.dispose();
+    }
+  }
+
   Widget _doctorPage() {
     if (tab == 4) { return const CareTrackingPage(clinician: true); }
     if (tab == 1) {
@@ -321,11 +385,15 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       return _wrap([
       _heading('نسخه‌ها', 'مدیریت نسخه‌های ثبت‌شده و پیش‌نویس‌ها'),
       _card(child: Column(children: [
-        _rowItem(Icons.description_rounded, 'نسخه پیش‌نویس #RX-001', '۲ قلم دارو • منتظر ثبت نهایی', trailing: const Chip(label: Text('پیش‌نویس'))),
-        const Divider(height: 1),
-        _rowItem(Icons.send_rounded, 'نسخه #RX-000', 'ارسال‌شده به داروخانه نمونه', color: teal, trailing: const Chip(label: Text('ارسال‌شده'))),
+        for (final p in DemoPrescriptionStore.instance.prescriptions) ...[
+          _rowItem(Icons.description_rounded, '${p.id} • ${p.medicine}', '${p.patientName} • ${p.dose} • ${p.frequency}', color: teal, trailing: Chip(label: Text(p.available ? 'ارسال‌شده' : 'کمبود'))),
+          const Divider(height: 1),
+        ],
       ])),
-      const SizedBox(height: 14), FilledButton.icon(onPressed: () => _toast('فرم نسخه‌نویسی در مرحله بعد به این پنل متصل می‌شود.'), icon: const Icon(Icons.add_rounded), label: const Text('ایجاد نسخه جدید')),
+      const SizedBox(height: 14),
+      FilledButton.icon(onPressed: _createDemoPrescription, icon: const Icon(Icons.add_rounded), label: const Text('ایجاد نسخه جدید')),
+      const SizedBox(height: 10),
+      _banner('نسخه‌ها در این حالت نمایشی بین پنل پزشک و داروخانه مشترک‌اند؛ ثبت آن‌ها تجویز پزشکی واقعی نیست.', Icons.info_outline_rounded, const Color(0xFFFFF5E6), const Color(0xFF94631A)),
     ]);
     }
     if (tab == 3) {
@@ -459,9 +527,24 @@ class _RoleWorkspaceState extends State<RoleWorkspace> {
       TextField(controller: search, decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'کد نسخه یا شناسه تست')),
       const SizedBox(height: 12),
       _card(child: Column(children: [
-        _rowItem(Icons.receipt_long_rounded, 'نسخه #RX-TEST-024', '۳ قلم • در انتظار بررسی', color: const Color(0xFFB7791F), trailing: const Icon(Icons.chevron_left_rounded)),
-        const Divider(height: 1), _rowItem(Icons.receipt_long_rounded, 'نسخه #RX-TEST-023', '۲ قلم • تحویل ناقص', color: teal, trailing: const Icon(Icons.chevron_left_rounded)),
+        for (final p in DemoPrescriptionStore.instance.prescriptions) ...[
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.receipt_long_rounded, color: p.available ? teal : const Color(0xFFC65B52)),
+            title: Text('${p.id} • ${p.medicine}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+            subtitle: Text('${p.patientName} • ${p.form} • ${p.dose}\n${p.frequency} • ${p.duration} • تعداد: ${p.quantity}', style: const TextStyle(fontSize: 11)),
+            isThreeLine: true,
+            trailing: Chip(label: Text(p.available ? 'موجود' : 'ناموجود')),
+          ),
+          Wrap(spacing: 8, children: [
+            OutlinedButton(onPressed: () => DemoPrescriptionStore.instance.setAvailability(p.id, true), child: const Text('ثبت تحویل')),
+            OutlinedButton(onPressed: () => DemoPrescriptionStore.instance.setAvailability(p.id, false), child: const Text('اعلام ناموجودی')),
+          ]),
+          const Divider(height: 12),
+        ],
       ])),
+      const SizedBox(height: 10),
+      _banner('تغییر وضعیت اینجا فوراً در فهرست نسخه‌های نمایشی منعکس می‌شود؛ این گردش کار هنوز به سرور متصل نیست.', Icons.info_outline_rounded, const Color(0xFFFFF5E6), const Color(0xFF94631A)),
     ]);
     }
     if (tab == 2) {
