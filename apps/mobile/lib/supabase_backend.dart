@@ -27,12 +27,19 @@ class _SupabaseAuthRepository implements AuthRepository {
   _SupabaseAuthRepository(this.client);
   final SupabaseClient client;
 
-  SessionUser _mapUser(User user) {
-    final metadata = user.userMetadata ?? const <String, dynamic>{};
+  Future<SessionUser> _mapUser(User user) async {
+    // Role is read from the protected profiles table, never trusted from
+    // user-editable Auth metadata.
+    final profile = await client.from('profiles').select('role, display_name')
+        .eq('id', user.id).maybeSingle();
+    if (profile == null) {
+      await client.auth.signOut();
+      throw StateError('Account profile is not provisioned. Contact the staging administrator.');
+    }
     return SessionUser(
       id: user.id,
-      role: metadata['role'] as String? ?? 'unassigned',
-      displayName: metadata['display_name'] as String? ?? user.email ?? 'کاربر',
+      role: profile['role'] as String,
+      displayName: profile['display_name'] as String,
     );
   }
 
@@ -41,7 +48,7 @@ class _SupabaseAuthRepository implements AuthRepository {
     final response = await client.auth.signInWithPassword(email: email.trim(), password: password);
     final user = response.user;
     if (user == null) throw StateError('Authentication returned no user');
-    return _mapUser(user);
+    return await _mapUser(user);
   }
 
   @override
@@ -50,7 +57,7 @@ class _SupabaseAuthRepository implements AuthRepository {
   @override
   Future<SessionUser?> currentUser() async {
     final user = client.auth.currentUser;
-    return user == null ? null : _mapUser(user);
+    return user == null ? null : await _mapUser(user);
   }
 }
 
