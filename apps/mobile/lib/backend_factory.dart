@@ -19,7 +19,7 @@ class RxBridgeBackendFactory {
       case RxBridgeBackendMode.supabaseStaging:
         await Supabase.initialize(
           url: RxBridgeBackendConfig.supabaseUrl,
-          anonKey: RxBridgeBackendConfig.supabaseAnonKey,
+          publishableKey: RxBridgeBackendConfig.supabaseAnonKey,
         );
         _instance = SupabaseRxBridgeBackend(Supabase.instance.client);
         return _instance;
