@@ -3,17 +3,21 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'care_pages.dart';
 import 'care_demo_store.dart';
 import 'sqlite_care_storage.dart';
+import 'backend_factory.dart';
+import 'backend_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    final storage = await SqliteCareSnapshotStorage.open();
-    await CareDemoStore.instance.attachStorage(storage);
+    await RxBridgeBackendFactory.initialize();
+    if (RxBridgeBackendConfig.mode == RxBridgeBackendMode.localDemo) {
+      final storage = await SqliteCareSnapshotStorage.open();
+      await CareDemoStore.instance.attachStorage(storage);
+    }
   } catch (error) {
-    // Persistence failure must remain visible in the UI; the test prototype
-    // can still run with explicitly marked volatile demo data.
+    // A remote backend configuration failure must not silently fall back to local data.
     demoStorageFailure = true;
-    debugPrint('Demo SQLite could not initialize: $error');
+    debugPrint('RxBridge backend initialization failed: $error');
   }
   runApp(const RxBridgeApp());
 }
