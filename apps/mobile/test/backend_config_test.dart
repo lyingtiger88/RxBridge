@@ -8,11 +8,10 @@ void main() {
   });
 
   test('unknown backend cannot silently fall back', () {
-    expect(
-      () => RxBridgeBackendConfig.modeName == 'unknown'
-          ? throw StateError('Unknown RXBRIDGE_BACKEND: unknown')
-          : null,
-      throwsStateError,
-    );
+    expect(() => RxBridgeBackendConfig.parseMode('unknown'), throwsStateError);
+    expect(RxBridgeBackendConfig.parseMode('supabaseStaging'),
+        RxBridgeBackendMode.supabaseStaging);
+    expect(RxBridgeBackendConfig.parseMode('iranianServer'),
+        RxBridgeBackendMode.iranianServer);
   });
 }
