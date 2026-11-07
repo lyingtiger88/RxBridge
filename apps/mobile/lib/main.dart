@@ -6,6 +6,7 @@ import 'prescription_demo_store.dart';
 import 'sqlite_care_storage.dart';
 import 'backend_factory.dart';
 import 'backend_config.dart';
+import 'staging_portal.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -96,7 +97,32 @@ class RxBridgeApp extends StatelessWidget {
         labelTextStyle: WidgetStateProperty.resolveWith((s) => TextStyle(fontSize: 11, fontWeight: s.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500, color: s.contains(WidgetState.selected) ? teal : muted)),
       ),
     ),
-    home: const RoleSelectionPage(),
+    home: demoStorageFailure && RxBridgeBackendConfig.modeName != 'localDemo'
+        ? const _BackendUnavailablePage()
+        : RxBridgeBackendConfig.modeName == 'localDemo'
+            ? const RoleSelectionPage()
+            : const StagingPortal(),
+  );
+}
+
+class _BackendUnavailablePage extends StatelessWidget {
+  const _BackendUnavailablePage();
+
+  @override
+  Widget build(BuildContext context) => const Scaffold(
+    body: SafeArea(child: Center(child: Padding(
+      padding: EdgeInsets.all(24),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.cloud_off_rounded, size: 54, color: Color(0xFFC65B52)),
+        SizedBox(height: 18),
+        Text('اتصال به محیط آزمایشی برقرار نشد',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+        SizedBox(height: 12),
+        Text('به دلایل امنیتی، برنامه به‌صورت خودکار وارد صفحات نمایشی نمی‌شود. تنظیمات اتصال را بررسی کنید.',
+          textAlign: TextAlign.center),
+      ]),
+    ))),
   );
 }
 
