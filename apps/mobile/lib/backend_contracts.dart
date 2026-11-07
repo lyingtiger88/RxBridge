@@ -19,10 +19,41 @@ abstract interface class CareRepository {
   Future<GlucoseReadingDto> addGlucoseReading(GlucoseReadingDto reading);
 }
 
+abstract interface class PrescriptionRepository {
+  Future<List<PrescriptionDto>> listAuthorizedPrescriptions();
+  Future<PrescriptionDto> createPrescription({
+    required String patientId, required String pharmacyId,
+    required String medicine, required String form, required String dose,
+    required String frequency, required String duration,
+    required String instructions, required int quantity,
+  });
+  Future<void> updateStatus({required String prescriptionId, required String status});
+}
+
+class PrescriptionDto {
+  final String id;
+  final String patientId;
+  final String medicine;
+  final String form;
+  final String dose;
+  final String frequency;
+  final String duration;
+  final String instructions;
+  final int quantity;
+  final String status;
+  const PrescriptionDto({
+    required this.id, required this.patientId, required this.medicine,
+    required this.form, required this.dose, required this.frequency,
+    required this.duration, required this.instructions,
+    required this.quantity, required this.status,
+  });
+}
+
 abstract interface class RxBridgeBackend {
   AuthRepository get auth;
   PatientRepository get patients;
   CareRepository get care;
+  PrescriptionRepository get prescriptions;
   Future<void> close();
 }
 
