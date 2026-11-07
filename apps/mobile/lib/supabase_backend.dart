@@ -7,7 +7,8 @@ class SupabaseRxBridgeBackend implements RxBridgeBackend {
   SupabaseRxBridgeBackend(this.client)
       : auth = _SupabaseAuthRepository(client),
         patients = _SupabasePatientRepository(client),
-        care = _SupabaseCareRepository(client);
+        care = _SupabaseCareRepository(client),
+        prescriptions = _SupabasePrescriptionRepository(client);
 
   final SupabaseClient client;
   @override
@@ -16,6 +17,8 @@ class SupabaseRxBridgeBackend implements RxBridgeBackend {
   final PatientRepository patients;
   @override
   final CareRepository care;
+  @override
+  final PrescriptionRepository prescriptions;
 
   @override
   Future<void> close() async {
@@ -144,5 +147,71 @@ class _SupabaseCareRepository implements CareRepository {
       measuredAt: DateTime.parse(row['measured_at'] as String).toUtc(),
       context: row['context'] as String,
     );
+  }
+}
+
+class _SupabasePrescriptionRepository implements PrescriptionRepository {
+  const _SupabasePrescriptionRepository(this.client);
+  final SupabaseClient client;
+
+  PrescriptionDto _map(Map<String, dynamic> row) => PrescriptionDto(
+    id: row['id'] as String,
+    patientId: row['patient_id'] as String,
+    medicine: row['medicine_name'] as String,
+    form: row['pharmaceutical_form'] as String,
+    dose: row['dose_label'] as String,
+    frequency: row['frequency_label'] as String,
+    duration: row['duration_label'] as String,
+    instructions: row['instructions'] as String,
+    quantity: row['quantity'] as int,
+    status: row['status'] as String,
+  );
+
+  @override
+  Future<List<PrescriptionDto>> listAuthorizedPrescriptions() async {
+    final rows = await client.from('prescriptions').select(
+      'id,patient_id,medicine_name,pharmaceutical_form,dose_label,frequency_label,duration_label,instructions,quantity,status'
+    ).order('created_at', ascending: false);
+    return rows.map((row) => _map(row)).toList(growable: false);
+  }
+
+  @override
+  Future<PrescriptionDto> createPrescription({
+    required String patientId, required String pharmacyId,
+    required String medicine, required String form, required String dose,
+    required String frequency, required String duration,
+    required String instructions, required int quantity,
+  }) async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) throw StateError('Not authenticated');
+    if (medicine.trim().isEmpty || dose.trim().isEmpty || quantity < 1 || quantity > 1000) {
+      throw ArgumentError('Invalid demonstration prescription');
+    }
+    final row = await client.from('prescriptions').insert({
+      'patient_id': patientId,
+      'doctor_id': userId,
+      'pharmacy_id': pharmacyId,
+      'medicine_name': medicine.trim(),
+      'pharmaceutical_form': form.trim(),
+      'dose_label': dose.trim(),
+      'frequency_label': frequency.trim(),
+      'duration_label': duration.trim(),
+      'instructions': instructions.trim(),
+      'quantity': quantity,
+      'status': 'sent',
+    }).select(
+      'id,patient_id,medicine_name,pharmaceutical_form,dose_label,frequency_label,duration_label,instructions,quantity,status'
+    ).single();
+    return _map(row);
+  }
+
+  @override
+  Future<void> updateStatus({required String prescriptionId, required String status}) async {
+    if (!['dispensed','unavailable'].contains(status)) throw ArgumentError.value(status);
+    final changed = await client.from('prescriptions')
+      .update({'status': status})
+      .eq('id', prescriptionId)
+      .select('id');
+    if (changed.isEmpty) throw StateError('Access denied or prescription not found');
   }
 }
