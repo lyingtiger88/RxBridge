@@ -7,11 +7,13 @@ class RxBridgeBackendConfig {
   static const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
   static const iranApiBaseUrl = String.fromEnvironment('RXBRIDGE_API_BASE_URL');
 
-  static RxBridgeBackendMode get mode => switch (modeName) {
+  static RxBridgeBackendMode get mode => parseMode(modeName);
+
+  static RxBridgeBackendMode parseMode(String value) => switch (value) {
     'localDemo' => RxBridgeBackendMode.localDemo,
     'supabaseStaging' => RxBridgeBackendMode.supabaseStaging,
     'iranianServer' => RxBridgeBackendMode.iranianServer,
-    _ => throw StateError('Unknown RXBRIDGE_BACKEND: $modeName'),
+    _ => throw StateError('Unknown RXBRIDGE_BACKEND: $value'),
   };
 
   static void validate() {
