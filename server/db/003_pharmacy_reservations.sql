@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS pharmacy_reservations (
   pharmacy_id UUID NOT NULL REFERENCES pharmacy_profiles(id) ON DELETE RESTRICT,
   patient_user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE RESTRICT,
   idempotency_key UUID NOT NULL,
+  request_hash CHAR(64) NOT NULL,
   status TEXT NOT NULL DEFAULT 'held'
     CHECK (status IN ('held','confirmed','cancelled','expired')),
   expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '10 minutes'),
