@@ -117,8 +117,8 @@ for update to authenticated using (
 
 -- Prevent patient clients from forging the computed score or doctor review fields.
 revoke update on public.habit_logs from anon, authenticated;
-grant update(range_result,points_awarded,reviewed_by,reviewed_at,doctor_feedback)
-on public.habit_logs to authenticated;
+-- Review fields are writable only through the SECURITY DEFINER review_habit_log function.
+-- Authenticated clients receive no direct UPDATE privilege on habit_logs.
 -- Trigger computes the range classification and score only from physician-authored plan thresholds.
 create or replace function public.compute_habit_log_result()
 returns trigger language plpgsql set search_path = ''
