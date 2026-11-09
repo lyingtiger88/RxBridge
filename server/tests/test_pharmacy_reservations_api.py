@@ -216,5 +216,27 @@ class PharmacyReservationApiTests(unittest.TestCase):
                 conn.execute("DELETE FROM app_users WHERE id=%s", (other_patient,))
 
 
+    def test_order_events_create_private_notifications_and_read_state(self):
+        order = self.create_order(1)
+        self.authenticate("pharmacist")
+        pharmacy_inbox = self.client.get("/v1/notifications/me")
+        self.assertEqual(pharmacy_inbox.status_code, 200, pharmacy_inbox.text)
+        self.assertEqual(pharmacy_inbox.json()["unread_count"], 1)
+        notification_id = pharmacy_inbox.json()["items"][0]["id"]
+        marked = self.client.post(f"/v1/notifications/{notification_id}/read")
+        self.assertEqual(marked.status_code, 200, marked.text)
+        self.authenticate("pharmacist")
+        accepted = self.client.post(
+            f"/v1/pharmacies/orders/{order['id']}/transition",
+            json={"action": "accept"},
+        )
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+        self.authenticate("patient")
+        patient_inbox = self.client.get("/v1/notifications/me")
+        self.assertEqual(patient_inbox.status_code, 200, patient_inbox.text)
+        self.assertEqual(patient_inbox.json()["unread_count"], 1)
+        self.assertEqual(patient_inbox.json()["items"][0]["event_type"], "order.accepted")
+
+
 if __name__ == "__main__":
     unittest.main()
