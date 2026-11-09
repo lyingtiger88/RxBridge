@@ -139,3 +139,81 @@ class PharmacyReservationApiTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def create_order(self, quantity=2):
+        reservation = self.reserve(uuid4(), quantity)
+        self.assertEqual(reservation.status_code, 201, reservation.text)
+        self.authenticate("patient")
+        order = self.client.post("/v1/pharmacies/orders", json={
+            "reservation_id": reservation.json()["id"],
+            "patient_note": "CI synthetic order",
+        })
+        self.assertEqual(order.status_code, 201, order.text)
+        return order.json()
+
+    def transition(self, order_id, role, action):
+        self.authenticate(role)
+        return self.client.post(
+            f"/v1/pharmacies/orders/{order_id}/transition",
+            json={"action": action, "pharmacy_note": "CI status update"},
+        )
+
+    def test_order_full_fulfilment_lifecycle(self):
+        order = self.create_order(2)
+        self.assertEqual(order["status"], "submitted")
+        accepted = self.transition(order["id"], "pharmacist", "accept")
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+        self.assertEqual(accepted.json()["status"], "accepted")
+        preparing = self.transition(order["id"], "pharmacist", "start_preparing")
+        self.assertEqual(preparing.status_code, 200, preparing.text)
+        self.assertEqual(preparing.json()["status"], "preparing")
+        ready = self.transition(order["id"], "pharmacist", "mark_ready")
+        self.assertEqual(ready.status_code, 200, ready.text)
+        self.assertEqual(ready.json()["status"], "ready")
+        dispensed = self.transition(order["id"], "patient", "dispense")
+        self.assertEqual(dispensed.status_code, 200, dispensed.text)
+        self.assertEqual(dispensed.json()["status"], "dispensed")
+        with main.connect() as conn:
+            stock = conn.execute(
+                "SELECT stock_quantity FROM pharmacy_inventory WHERE id=%s",
+                (self.inventory_id,),
+            ).fetchone()["stock_quantity"]
+        self.assertEqual(stock, 3)
+
+    def test_pharmacy_cancellation_after_acceptance_restocks(self):
+        order = self.create_order(3)
+        accepted = self.transition(order["id"], "pharmacist", "accept")
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+        cancelled = self.transition(order["id"], "pharmacist", "cancel")
+        self.assertEqual(cancelled.status_code, 200, cancelled.text)
+        self.assertEqual(cancelled.json()["status"], "cancelled")
+        with main.connect() as conn:
+            stock = conn.execute(
+                "SELECT stock_quantity FROM pharmacy_inventory WHERE id=%s",
+                (self.inventory_id,),
+            ).fetchone()["stock_quantity"]
+        self.assertEqual(stock, 5)
+
+    def test_patient_cannot_read_or_advance_another_users_order(self):
+        order = self.create_order(1)
+        other_patient = uuid4()
+        with main.connect() as conn:
+            conn.execute(
+                "INSERT INTO app_users(id,username,password_hash,role,display_name) VALUES (%s,%s,'x','patient','Other patient')",
+                (other_patient, f"ci_other_{other_patient.hex}"),
+            )
+        try:
+            main.app.dependency_overrides[main.current_user] = lambda: {
+                "id": other_patient, "username": "other", "role": "patient",
+                "display_name": "Other", "active": True,
+            }
+            result = self.client.post(
+                f"/v1/pharmacies/orders/{order['id']}/transition",
+                json={"action": "dispense"},
+            )
+            self.assertEqual(result.status_code, 403)
+        finally:
+            main.app.dependency_overrides.clear()
+            with main.connect() as conn:
+                conn.execute("DELETE FROM app_users WHERE id=%s", (other_patient,))
