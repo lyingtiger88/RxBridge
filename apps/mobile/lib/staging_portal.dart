@@ -388,6 +388,11 @@ class _HealthyHabitsPanelState extends State<_HealthyHabitsPanel> {
     Text(label,style:const TextStyle(fontSize:10,color:Colors.blueGrey)),
   ]);
 
+  void _openAchievements() {
+    if (widget.role != 'patient') return;
+    showModalBottomSheet<void>(context: context, isScrollControlled: true, showDragHandle: true, builder: (context) => _AchievementsSheet(logs: logs));
+  }
+
   Widget _achievementCard() {
     final points=logs.fold<int>(0,(sum,log)=>sum+log.pointsAwarded);
     final String level;
@@ -539,6 +544,12 @@ class _HealthyHabitsPanelState extends State<_HealthyHabitsPanel> {
           FilledButton(onPressed:busy?null:_createPlan,child:const Text('ثبت دستور برای بیمار')),
         ],
         const Divider(height:28),
+        if(plans.isNotEmpty && widget.role=='patient') Align(
+          alignment:Alignment.centerRight,
+          child:TextButton.icon(onPressed:_openAchievements,
+            icon:const Icon(Icons.workspace_premium_outlined),
+            label:const Text('دستاوردهای من')),
+        ),
         if(plans.isNotEmpty) _achievementCard(),
         if(plans.isNotEmpty) _progressSummary(),
         if(plans.isNotEmpty) _weeklyCalendar(),
@@ -575,4 +586,32 @@ class _HealthyHabitsPanelState extends State<_HealthyHabitsPanel> {
       ],
     )),
   );
+}
+class _AchievementsSheet extends StatelessWidget {
+  const _AchievementsSheet({required this.logs});
+  final List<HabitLogDto> logs;
+  @override
+  Widget build(BuildContext context) {
+    final approved=logs.where((x)=>x.reviewed && x.pointsAwarded>0).toList()..sort((a,b)=>a.occurredAt.compareTo(b.occurredAt));
+    final total=approved.fold<int>(0,(sum,x)=>sum+x.pointsAwarded);
+    final milestones=<({String name,int threshold,IconData icon,Color color})>[
+      (name:'برنزی',threshold:5,icon:Icons.emoji_events_rounded,color:const Color(0xFFB77948)),
+      (name:'نقره‌ای',threshold:20,icon:Icons.military_tech_rounded,color:const Color(0xFF718096)),
+      (name:'طلایی',threshold:50,icon:Icons.workspace_premium_rounded,color:const Color(0xFFC18B19)),
+    ];
+    int running=0; final earnedAt=<int,DateTime>{};
+    for(final log in approved) { final before=running; running+=log.pointsAwarded; for(final m in milestones) { if(before<m.threshold && running>=m.threshold) earnedAt[m.threshold]=log.occurredAt; } }
+    final upcoming=milestones.where((m)=>total<m.threshold).toList(); final next=upcoming.isEmpty?null:upcoming.first;
+    return SafeArea(child:Padding(padding:EdgeInsets.only(left:20,right:20,top:8,bottom:MediaQuery.of(context).viewInsets.bottom+20),child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+      const Text('دستاوردهای من',style:TextStyle(fontSize:22,fontWeight:FontWeight.w800)),
+      Text('$total امتیاز تأییدشده از پزشک',style:const TextStyle(color:Colors.blueGrey)),
+      const SizedBox(height:14),
+      for(final m in milestones) Builder(builder:(context) { final date=earnedAt[m.threshold]; final achieved=total>=m.threshold; return Card(child:ListTile(leading:CircleAvatar(backgroundColor:achieved?m.color.withValues(alpha:.15):const Color(0xFFF0F2F4),child:Icon(m.icon,color:achieved?m.color:Colors.grey)),title:Text('نشان ${m.name}',style:const TextStyle(fontWeight:FontWeight.w700)),subtitle:Text(achieved?'دریافت‌شده • ${date==null?'تاریخ ثبت نشده':MaterialLocalizations.of(context).formatShortDate(date.toLocal())}':'${m.threshold-total} امتیاز تا دریافت نشان'),trailing:Icon(achieved?Icons.check_circle:Icons.lock_outline,color:achieved?Colors.teal:Colors.grey))); }),
+      if(next!=null) Text('هدف بعدی: نشان ${next.name} در ${next.threshold} امتیاز',textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.w600)),
+      const Divider(), const Text('تاریخچه امتیازهای تأییدشده',style:TextStyle(fontWeight:FontWeight.w800)),
+      if(approved.isEmpty) const Text('هنوز امتیاز تأییدشده‌ای ثبت نشده است.'),
+      for(final log in approved.reversed.take(30)) ListTile(dense:true,leading:const Icon(Icons.verified_rounded,color:Colors.teal),title:Text('+ ${log.pointsAwarded} امتیاز'),subtitle:Text(MaterialLocalizations.of(context).formatShortDate(log.occurredAt.toLocal())),trailing:Text(log.measuredValue==null?'ثبت عادت':'${log.measuredValue}')),
+      const Text('این نشان‌ها میزان پایبندی ثبت‌شده را نمایش می‌دهند و معیار نتیجه یا کیفیت درمان نیستند.',style:TextStyle(fontSize:11,color:Colors.blueGrey)),
+    ])));
+  }
 }
