@@ -49,11 +49,57 @@ class PrescriptionDto {
   });
 }
 
+class HabitPlanDto {
+  final String id, patientId, title, habitType, instruction, unitLabel, targetDescription;
+  final double? targetMin, targetMax;
+  final int frequencyPerDay;
+  final bool active;
+  const HabitPlanDto({
+    required this.id, required this.patientId, required this.title,
+    required this.habitType, required this.instruction, required this.unitLabel,
+    required this.targetDescription, required this.targetMin, required this.targetMax,
+    required this.frequencyPerDay, required this.active,
+  });
+}
+
+class HabitLogDto {
+  final String id, planId, patientId, rangeResult, doctorFeedback;
+  final double? measuredValue;
+  final bool completed;
+  final int pointsAwarded;
+  final DateTime occurredAt;
+  final bool reviewed;
+  const HabitLogDto({
+    required this.id, required this.planId, required this.patientId,
+    required this.rangeResult, required this.doctorFeedback,
+    required this.measuredValue, required this.completed,
+    required this.pointsAwarded, required this.occurredAt, required this.reviewed,
+  });
+}
+
+abstract interface class HabitRepository {
+  Future<List<HabitPlanDto>> listPlans({required String patientId});
+  Future<HabitPlanDto> createPlan({
+    required String patientId, required String title, required String habitType,
+    required String instruction, required String unitLabel,
+    required double? targetMin, required double? targetMax,
+    required String targetDescription, required int frequencyPerDay,
+  });
+  Future<List<HabitLogDto>> listLogs({required String patientId});
+  Future<HabitLogDto> submitLog({
+    required String planId, required String patientId,
+    required double? measuredValue, required bool completed,
+    required String note, required DateTime occurredAt,
+  });
+  Future<void> reviewLog({required String logId, required String feedback});
+}
+
 abstract interface class RxBridgeBackend {
   AuthRepository get auth;
   PatientRepository get patients;
   CareRepository get care;
   PrescriptionRepository get prescriptions;
+  HabitRepository get habits;
   Future<void> close();
 }
 
