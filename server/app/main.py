@@ -138,6 +138,8 @@ def root():
 
 
 import math
+import hashlib
+import json
 from uuid import UUID
 from pydantic import Field
 
@@ -222,6 +224,7 @@ def save_my_pharmacy(body: PharmacyProfileInput, user=Depends(require_roles("pha
                 WHEN pharmacy_profiles.latitude IS DISTINCT FROM EXCLUDED.latitude
                   OR pharmacy_profiles.longitude IS DISTINCT FROM EXCLUDED.longitude
                   OR pharmacy_profiles.address IS DISTINCT FROM EXCLUDED.address
+                  OR pharmacy_profiles.pharmacy_name IS DISTINCT FROM EXCLUDED.pharmacy_name
                 THEN FALSE
                 ELSE (EXCLUDED.is_published AND pharmacy_profiles.verification_status='verified')
               END,
@@ -229,6 +232,7 @@ def save_my_pharmacy(body: PharmacyProfileInput, user=Depends(require_roles("pha
                 WHEN pharmacy_profiles.latitude IS DISTINCT FROM EXCLUDED.latitude
                   OR pharmacy_profiles.longitude IS DISTINCT FROM EXCLUDED.longitude
                   OR pharmacy_profiles.address IS DISTINCT FROM EXCLUDED.address
+                  OR pharmacy_profiles.pharmacy_name IS DISTINCT FROM EXCLUDED.pharmacy_name
                 THEN 'pending' ELSE pharmacy_profiles.verification_status END,
               updated_at=now()
             RETURNING *
@@ -405,12 +409,18 @@ def _reservation_payload(conn, reservation):
 @app.post("/v1/pharmacies/{pharmacy_id}/reservations", status_code=201)
 def create_pharmacy_reservation(pharmacy_id: UUID, body: PharmacyReservationInput,
                                 user=Depends(require_roles("patient"))):
+    request_hash = hashlib.sha256(json.dumps(
+        body.model_dump(mode="json", exclude={"idempotency_key"}),
+        sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")).hexdigest()
     with connect() as conn:
         existing = conn.execute("""
             SELECT * FROM pharmacy_reservations
             WHERE patient_user_id=%s AND idempotency_key=%s
         """, (user["id"], body.idempotency_key)).fetchone()
         if existing:
+            if existing["request_hash"] != request_hash:
+                raise HTTPException(status_code=409, detail="Idempotency key was already used for a different request")
             return _reservation_payload(conn, existing)
 
         pharmacy = conn.execute("""
@@ -459,16 +469,18 @@ def create_pharmacy_reservation(pharmacy_id: UUID, body: PharmacyReservationInpu
 
         reservation = conn.execute("""
             INSERT INTO pharmacy_reservations
-              (pharmacy_id, patient_user_id, idempotency_key)
-            VALUES (%s,%s,%s)
+              (pharmacy_id, patient_user_id, idempotency_key, request_hash)
+            VALUES (%s,%s,%s,%s)
             ON CONFLICT (patient_user_id,idempotency_key) DO NOTHING
             RETURNING *
-        """, (pharmacy_id, user["id"], body.idempotency_key)).fetchone()
+        """, (pharmacy_id, user["id"], body.idempotency_key, request_hash)).fetchone()
         if reservation is None:
             reservation = conn.execute("""
                 SELECT * FROM pharmacy_reservations
                 WHERE patient_user_id=%s AND idempotency_key=%s
             """, (user["id"], body.idempotency_key)).fetchone()
+            if reservation["request_hash"] != request_hash:
+                raise HTTPException(status_code=409, detail="Idempotency key was already used for a different request")
             return _reservation_payload(conn, reservation)
 
         for candidate, requested in selected:
@@ -568,3 +580,41 @@ def cancel_pharmacy_reservation(reservation_id: UUID,
         if not reservation:
             raise HTTPException(status_code=404, detail="Active reservation not found")
         return _reservation_payload(conn, reservation)
+
+
+class PharmacyPublicationInput(BaseModel):
+    is_published: bool
+
+
+@app.patch("/v1/pharmacies/me/publication")
+def set_my_pharmacy_publication(body: PharmacyPublicationInput,
+                                user=Depends(require_roles("pharmacist"))):
+    with connect() as conn:
+        row = conn.execute("""
+            UPDATE pharmacy_profiles
+            SET is_published=%s, updated_at=now()
+            WHERE user_id=%s AND verification_status='verified'
+            RETURNING id, pharmacy_name, verification_status, is_published
+        """, (body.is_published, user["id"])).fetchone()
+        if not row:
+            exists = conn.execute(
+                "SELECT id FROM pharmacy_profiles WHERE user_id=%s", (user["id"],)
+            ).fetchone()
+            if not exists:
+                raise HTTPException(status_code=404, detail="Pharmacy profile not found")
+            raise HTTPException(status_code=409, detail="Pharmacy must be verified before publication")
+        return row
+
+
+@app.get("/v1/admin/pharmacies/pending")
+def list_pending_pharmacies(user=Depends(require_roles("admin"))):
+    with connect() as conn:
+        rows = conn.execute("""
+            SELECT id, user_id, pharmacy_name, address, phone, latitude, longitude,
+                   verification_status, is_published, created_at, updated_at
+            FROM pharmacy_profiles
+            WHERE verification_status='pending'
+            ORDER BY created_at ASC
+            LIMIT 200
+        """).fetchall()
+    return rows
