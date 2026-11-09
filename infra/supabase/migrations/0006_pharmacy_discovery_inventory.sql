@@ -156,10 +156,16 @@ begin
       coalesce(sum(i.unit_price_irr*r.quantity) filter (where i.id is not null and i.stock_quantity>=r.quantity),0)::bigint as complete_total
     from public.pharmacies ph
     cross join requested r
-    left join public.pharmacy_inventory i
-      on i.pharmacy_id=ph.id and i.is_listed
-      and lower(trim(i.medicine_key))=r.medicine_key
-      and lower(trim(i.pharmaceutical_form))=r.form_key
+    left join lateral (
+      select inv.id,inv.stock_quantity,inv.unit_price_irr,inv.price_updated_at,inv.stock_updated_at
+      from public.pharmacy_inventory inv
+      where inv.pharmacy_id=ph.id and inv.is_listed
+        and lower(trim(inv.medicine_key))=r.medicine_key
+        and lower(trim(inv.pharmaceutical_form))=r.form_key
+      order by (inv.stock_quantity>=r.quantity) desc, inv.unit_price_irr asc,
+        inv.stock_updated_at desc
+      limit 1
+    ) i on true
     where ph.is_published
     group by ph.id,ph.pharmacy_name,ph.address,ph.city,ph.province,
       ph.latitude,ph.longitude,ph.accepts_reservations
