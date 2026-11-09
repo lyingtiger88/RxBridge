@@ -592,7 +592,7 @@ class _AchievementsSheet extends StatelessWidget {
   final List<HabitLogDto> logs;
   @override
   Widget build(BuildContext context) {
-    final approved=logs.where((x)=>x.reviewed && x.pointsAwarded>0).toList()..sort((a,b)=>a.occurredAt.compareTo(b.occurredAt));
+    final approved=logs.where((x)=>x.reviewed && x.pointsAwarded>0).toList()..sort((a,b)=>(a.reviewedAt ?? a.occurredAt).compareTo(b.reviewedAt ?? b.occurredAt));
     final total=approved.fold<int>(0,(sum,x)=>sum+x.pointsAwarded);
     final milestones=<({String name,int threshold,IconData icon,Color color})>[
       (name:'برنزی',threshold:5,icon:Icons.emoji_events_rounded,color:const Color(0xFFB77948)),
@@ -600,9 +600,9 @@ class _AchievementsSheet extends StatelessWidget {
       (name:'طلایی',threshold:50,icon:Icons.workspace_premium_rounded,color:const Color(0xFFC18B19)),
     ];
     int running=0; final earnedAt=<int,DateTime>{};
-    for(final log in approved) { final before=running; running+=log.pointsAwarded; for(final m in milestones) { if(before<m.threshold && running>=m.threshold) earnedAt[m.threshold]=log.occurredAt; } }
+    for(final log in approved) { final before=running; running+=log.pointsAwarded; for(final m in milestones) { if(before<m.threshold && running>=m.threshold) earnedAt[m.threshold]=log.reviewedAt ?? log.occurredAt; } }
     final upcoming=milestones.where((m)=>total<m.threshold).toList(); final next=upcoming.isEmpty?null:upcoming.first;
-    return SafeArea(child:Padding(padding:EdgeInsets.only(left:20,right:20,top:8,bottom:MediaQuery.of(context).viewInsets.bottom+20),child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+    return SafeArea(child:Padding(padding:EdgeInsets.only(left:20,right:20,top:8,bottom:MediaQuery.of(context).viewInsets.bottom+20),child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
       const Text('دستاوردهای من',style:TextStyle(fontSize:22,fontWeight:FontWeight.w800)),
       Text('$total امتیاز تأییدشده از پزشک',style:const TextStyle(color:Colors.blueGrey)),
       const SizedBox(height:14),
@@ -610,7 +610,7 @@ class _AchievementsSheet extends StatelessWidget {
       if(next!=null) Text('هدف بعدی: نشان ${next.name} در ${next.threshold} امتیاز',textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.w600)),
       const Divider(), const Text('تاریخچه امتیازهای تأییدشده',style:TextStyle(fontWeight:FontWeight.w800)),
       if(approved.isEmpty) const Text('هنوز امتیاز تأییدشده‌ای ثبت نشده است.'),
-      for(final log in approved.reversed.take(30)) ListTile(dense:true,leading:const Icon(Icons.verified_rounded,color:Colors.teal),title:Text('+ ${log.pointsAwarded} امتیاز'),subtitle:Text(MaterialLocalizations.of(context).formatShortDate(log.occurredAt.toLocal())),trailing:Text(log.measuredValue==null?'ثبت عادت':'${log.measuredValue}')),
+      for(final log in approved.reversed.take(30)) ListTile(dense:true,leading:const Icon(Icons.verified_rounded,color:Colors.teal),title:Text('+ ${log.pointsAwarded} امتیاز'),subtitle:Text(MaterialLocalizations.of(context).formatShortDate((log.reviewedAt ?? log.occurredAt).toLocal())),trailing:Text(log.measuredValue==null?'ثبت عادت':'${log.measuredValue}')),
       const Text('این نشان‌ها میزان پایبندی ثبت‌شده را نمایش می‌دهند و معیار نتیجه یا کیفیت درمان نیستند.',style:TextStyle(fontSize:11,color:Colors.blueGrey)),
     ])));
   }
