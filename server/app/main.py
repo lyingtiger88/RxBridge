@@ -481,7 +481,7 @@ def create_pharmacy_reservation(pharmacy_id: UUID, body: PharmacyReservationInpu
             """, (reservation["id"], candidate["id"], candidate["medicine_name"],
                   candidate["dosage_form"], candidate["strength"], candidate["package_label"],
                   requested.quantity, candidate["unit_price"], line_total))
-    return _reservation_payload(conn, reservation)
+        return _reservation_payload(conn, reservation)
 
 
 @app.get("/v1/pharmacies/reservations/me")
