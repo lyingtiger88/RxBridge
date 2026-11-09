@@ -9,6 +9,7 @@ services:
     volumes:
       - rxbridge_pgdata:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+      - ./db/002_pharmacy_network.sql:/docker-entrypoint-initdb.d/002-pharmacy-network.sql:ro
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER:-rxbridge} -d ${POSTGRES_DB:-rxbridge}"]
       interval: 10s
