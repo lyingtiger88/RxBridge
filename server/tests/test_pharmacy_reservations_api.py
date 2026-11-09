@@ -1,6 +1,10 @@
 import os
 import unittest
+import sys
+from pathlib import Path
 from uuid import uuid4
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 if os.environ.get("RXBRIDGE_INTEGRATION_TESTS") != "1":
     raise unittest.SkipTest("Integration tests run only in the PostgreSQL CI job")
