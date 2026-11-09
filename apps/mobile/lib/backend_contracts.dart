@@ -54,11 +54,14 @@ class HabitPlanDto {
   final double? targetMin, targetMax;
   final int frequencyPerDay;
   final bool active;
+  final List<String> reminderTimes;
+  final List<String> activeDays;
   const HabitPlanDto({
     required this.id, required this.patientId, required this.title,
     required this.habitType, required this.instruction, required this.unitLabel,
     required this.targetDescription, required this.targetMin, required this.targetMax,
     required this.frequencyPerDay, required this.active,
+    required this.reminderTimes, required this.activeDays,
   });
 }
 
@@ -84,6 +87,7 @@ abstract interface class HabitRepository {
     required String instruction, required String unitLabel,
     required double? targetMin, required double? targetMax,
     required String targetDescription, required int frequencyPerDay,
+    required List<String> reminderTimes,
   });
   Future<List<HabitLogDto>> listLogs({required String patientId});
   Future<HabitLogDto> submitLog({
