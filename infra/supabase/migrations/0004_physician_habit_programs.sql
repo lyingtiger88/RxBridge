@@ -142,7 +142,7 @@ create or replace function public.review_habit_log(
   p_log_id uuid, p_feedback text default ''
 ) returns void language plpgsql security definer set search_path = ''
 as $$
-declare hp public.habit_plans%rowtype; lg public.habit_logs%rowtype;
+declare hp public.habit_plans%rowtype; lg public.habit_logs%rowtype; outside_target boolean;
 begin
   select * into lg from public.habit_logs where id=p_log_id;
   if not found then raise exception 'Habit log not found'; end if;
@@ -151,6 +151,12 @@ begin
     or not public.has_patient_access(hp.patient_id,array['doctor'])
     or not public.has_patient_consent(hp.patient_id,'clinical_record') then
     raise exception 'Not authorized to review this habit log';
+  end if;
+  outside_target := not lg.completed or (lg.measured_value is not null and
+    ( (hp.target_min is not null and lg.measured_value < hp.target_min)
+      or (hp.target_max is not null and lg.measured_value > hp.target_max) ));
+  if outside_target and length(trim(coalesce(p_feedback,''))) = 0 then
+    raise exception 'Doctor feedback is required when the reported habit is outside the prescribed range';
   end if;
   update public.habit_logs set
     range_result = case
