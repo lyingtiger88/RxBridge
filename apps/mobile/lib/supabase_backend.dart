@@ -231,6 +231,8 @@ class _SupabaseHabitRepository implements HabitRepository {
     targetMin:(r['target_min'] as num?)?.toDouble(),
     targetMax:(r['target_max'] as num?)?.toDouble(),
     frequencyPerDay:r['frequency_per_day'] as int, active:r['active'] as bool,
+    reminderTimes:List<String>.from(r['reminder_times'] ?? const []),
+    activeDays:List<String>.from(r['active_days'] ?? const []),
   );
 
   HabitLogDto _mapLog(Map<String,dynamic> r) => HabitLogDto(
@@ -255,6 +257,7 @@ class _SupabaseHabitRepository implements HabitRepository {
     required String instruction, required String unitLabel,
     required double? targetMin, required double? targetMax,
     required String targetDescription, required int frequencyPerDay,
+    required List<String> reminderTimes,
   }) async {
     if(title.trim().isEmpty||instruction.trim().isEmpty||frequencyPerDay<1||frequencyPerDay>24||
       (targetMin!=null&&targetMax!=null&&targetMin>targetMax)) {
@@ -267,6 +270,7 @@ class _SupabaseHabitRepository implements HabitRepository {
       'habit_type':habitType,'instruction':instruction.trim(),'unit_label':unitLabel.trim(),
       'target_min':targetMin,'target_max':targetMax,
       'target_description':targetDescription.trim(),'frequency_per_day':frequencyPerDay,
+      'reminder_times':reminderTimes,
     }).select().single();
     return _mapPlan(row);
   }
