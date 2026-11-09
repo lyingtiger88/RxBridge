@@ -135,3 +135,206 @@ def record_demo_consent(body: ConsentRequest, user=Depends(require_roles("admin"
 @app.get("/")
 def root():
     return {"service": "RxBridge Staging API", "docs": "/docs", "warning": "Synthetic test data only"}
+
+
+import math
+from pydantic import Field
+
+class PharmacyProfileInput(BaseModel):
+    pharmacy_name: str = Field(min_length=2, max_length=180)
+    address: str = Field(min_length=5, max_length=500)
+    phone: str | None = Field(default=None, max_length=40)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    is_published: bool = False
+
+
+class PharmacyInventoryInput(BaseModel):
+    medicine_name: str = Field(min_length=2, max_length=180)
+    dosage_form: str = Field(min_length=1, max_length=80)
+    strength: str = Field(default="", max_length=80)
+    package_label: str = Field(default="", max_length=120)
+    unit_price: int = Field(ge=0, le=100_000_000_000)
+    stock_quantity: int = Field(ge=0, le=10_000_000)
+    is_active: bool = True
+
+
+class PrescriptionSearchItem(BaseModel):
+    medicine_name: str = Field(min_length=2, max_length=180)
+    dosage_form: str = Field(min_length=1, max_length=80)
+    strength: str = Field(default="", max_length=80)
+    package_label: str = Field(default="", max_length=120)
+    quantity: int = Field(ge=1, le=100_000)
+
+
+class PharmacySearchRequest(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    radius_km: float = Field(default=20, gt=0, le=100)
+    items: list[PrescriptionSearchItem] = Field(min_length=1, max_length=100)
+
+
+def _distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    radius = 6371.0088
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return radius * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def _norm(value: str) -> str:
+    return " ".join(value.casefold().split())
+
+
+@app.get("/v1/pharmacies/me")
+def get_my_pharmacy(user=Depends(require_roles("pharmacist"))):
+    with connect() as conn:
+        profile = conn.execute(
+            "SELECT * FROM pharmacy_profiles WHERE user_id=%s", (user["id"],)
+        ).fetchone()
+        if not profile:
+            return {"profile": None, "inventory": []}
+        inventory = conn.execute(
+            "SELECT * FROM pharmacy_inventory WHERE pharmacy_id=%s ORDER BY medicine_name",
+            (profile["id"],),
+        ).fetchall()
+    return {"profile": profile, "inventory": inventory}
+
+
+@app.put("/v1/pharmacies/me")
+def save_my_pharmacy(body: PharmacyProfileInput, user=Depends(require_roles("pharmacist"))):
+    if (body.latitude is None) != (body.longitude is None):
+        raise HTTPException(status_code=422, detail="Latitude and longitude must be supplied together")
+    with connect() as conn:
+        row = conn.execute("""
+            INSERT INTO pharmacy_profiles
+              (user_id, pharmacy_name, address, phone, latitude, longitude, is_published)
+            VALUES (%s,%s,%s,%s,%s,%s,FALSE)
+            ON CONFLICT(user_id) DO UPDATE SET
+              pharmacy_name=EXCLUDED.pharmacy_name,
+              address=EXCLUDED.address,
+              phone=EXCLUDED.phone,
+              latitude=EXCLUDED.latitude,
+              longitude=EXCLUDED.longitude,
+              is_published=FALSE,
+              verification_status=CASE
+                WHEN pharmacy_profiles.latitude IS DISTINCT FROM EXCLUDED.latitude
+                  OR pharmacy_profiles.longitude IS DISTINCT FROM EXCLUDED.longitude
+                  OR pharmacy_profiles.address IS DISTINCT FROM EXCLUDED.address
+                THEN 'pending' ELSE pharmacy_profiles.verification_status END,
+              updated_at=now()
+            RETURNING *
+        """, (user["id"], body.pharmacy_name.strip(), body.address.strip(),
+              body.phone, body.latitude, body.longitude)).fetchone()
+    return {"profile": row, "note": "Publication remains disabled until an administrator verifies the pharmacy."}
+
+
+@app.put("/v1/pharmacies/me/inventory")
+def upsert_pharmacy_inventory(body: PharmacyInventoryInput, user=Depends(require_roles("pharmacist"))):
+    with connect() as conn:
+        profile = conn.execute(
+            "SELECT id FROM pharmacy_profiles WHERE user_id=%s", (user["id"],)
+        ).fetchone()
+        if not profile:
+            raise HTTPException(status_code=409, detail="Create the pharmacy profile first")
+        row = conn.execute("""
+            INSERT INTO pharmacy_inventory
+              (pharmacy_id, medicine_name, dosage_form, strength, package_label,
+               unit_price, stock_quantity, is_active)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (pharmacy_id, medicine_name, dosage_form, strength, package_label)
+            DO UPDATE SET unit_price=EXCLUDED.unit_price,
+              stock_quantity=EXCLUDED.stock_quantity, is_active=EXCLUDED.is_active,
+              updated_at=now()
+            RETURNING *
+        """, (profile["id"], body.medicine_name.strip(), body.dosage_form.strip(),
+              body.strength.strip(), body.package_label.strip(), body.unit_price,
+              body.stock_quantity, body.is_active)).fetchone()
+    return row
+
+
+@app.post("/v1/pharmacies/search")
+def search_pharmacies(body: PharmacySearchRequest, user=Depends(require_roles("patient"))):
+    with connect() as conn:
+        pharmacies = conn.execute("""
+            SELECT id, pharmacy_name, address, phone, latitude, longitude
+            FROM pharmacy_profiles
+            WHERE is_published=TRUE AND verification_status='verified'
+              AND latitude IS NOT NULL AND longitude IS NOT NULL
+        """).fetchall()
+        results = []
+        for pharmacy in pharmacies:
+            distance = _distance_km(body.latitude, body.longitude,
+                                    pharmacy["latitude"], pharmacy["longitude"])
+            if distance > body.radius_km:
+                continue
+            inventory = conn.execute("""
+                SELECT medicine_name, dosage_form, strength, package_label,
+                       unit_price, stock_quantity, updated_at
+                FROM pharmacy_inventory
+                WHERE pharmacy_id=%s AND is_active=TRUE
+            """, (pharmacy["id"],)).fetchall()
+            matched = []
+            missing = []
+            available_subtotal = 0
+            full_total = 0
+            complete = True
+            freshness = None
+            for requested in body.items:
+                candidates = [item for item in inventory
+                    if _norm(item["medicine_name"]) == _norm(requested.medicine_name)
+                    and _norm(item["dosage_form"]) == _norm(requested.dosage_form)
+                    and _norm(item["strength"]) == _norm(requested.strength)
+                    and _norm(item["package_label"]) == _norm(requested.package_label)]
+                # Exact deterministic match; do not silently substitute a different medicine or pack.
+                candidate = candidates[0] if candidates else None
+                if candidate is None or candidate["stock_quantity"] < requested.quantity:
+                    complete = False
+                    missing.append({
+                        "medicine_name": requested.medicine_name,
+                        "requested_quantity": requested.quantity,
+                        "available_quantity": 0 if candidate is None else candidate["stock_quantity"],
+                    })
+                    if candidate is not None:
+                        available_subtotal += candidate["unit_price"] * min(candidate["stock_quantity"], requested.quantity)
+                    continue
+                line_total = candidate["unit_price"] * requested.quantity
+                available_subtotal += line_total
+                full_total += line_total
+                matched.append({
+                    "medicine_name": requested.medicine_name,
+                    "quantity": requested.quantity,
+                    "unit_price": candidate["unit_price"],
+                    "line_total": line_total,
+                })
+                updated = candidate["updated_at"]
+                freshness = updated if freshness is None or updated > freshness else freshness
+            coverage = round((len(matched) / len(body.items)) * 100)
+            results.append({
+                "pharmacy_id": str(pharmacy["id"]),
+                "pharmacy_name": pharmacy["pharmacy_name"],
+                "address": pharmacy["address"],
+                "phone": pharmacy["phone"],
+                "latitude": pharmacy["latitude"],
+                "longitude": pharmacy["longitude"],
+                "distance_km": round(distance, 2),
+                "coverage_percent": coverage,
+                "complete": complete,
+                "total_price": full_total if complete else None,
+                "available_items_subtotal": available_subtotal,
+                "matched_items": matched,
+                "missing_items": missing,
+                "inventory_updated_at": freshness,
+            })
+    # Rank by coverage first; compare total price only among complete baskets.
+    results.sort(key=lambda x: (
+        -x["coverage_percent"],
+        x["total_price"] if x["complete"] else x["available_items_subtotal"],
+        x["distance_km"],
+    ))
+    return {
+        "synthetic_data_only": settings.staging_mode,
+        "matching_policy": "exact medicine, dosage form, strength and package; no automatic substitution",
+        "results": results,
+    }
