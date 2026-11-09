@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS demo_prescriptions (
  doctor_id UUID NOT NULL REFERENCES app_users(id), status TEXT NOT NULL DEFAULT 'draft',
  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-\nCREATE TABLE IF NOT EXISTS demo_glucose_readings (
+CREATE TABLE IF NOT EXISTS demo_glucose_readings (
  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), patient_id UUID NOT NULL REFERENCES demo_patients(id),
  value_mg_dl INTEGER NOT NULL CHECK(value_mg_dl BETWEEN 1 AND 1000),
  measured_at TIMESTAMPTZ NOT NULL, context TEXT NOT NULL,
