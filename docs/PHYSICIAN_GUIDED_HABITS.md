@@ -30,3 +30,11 @@ Run `infra/supabase/migrations/0004_physician_habit_programs.sql` after migratio
 - The progress summary reports submitted logs, doctor-reviewed logs, approved points, and adherence percentage among reviewed logs only.
 - Pending logs are excluded from the adherence denominator. Out-of-range and missed reports remain zero-point and require clinician feedback.
 - Time-zone scheduling uses the device's current local time zone. Patients must re-enable reminders after reinstalling the app or changing devices.
+
+## Patient adherence badges
+- Bronze: 5 physician-approved adherence points.
+- Silver: 20 physician-approved adherence points.
+- Gold: 50 physician-approved adherence points.
+- Only points awarded by the clinician review workflow count. Pending, self-reported, out-of-range and missed entries do not count.
+- Badges are motivational indicators of recorded adherence, not clinical outcomes, treatment quality, or a measure of disease control.
+- Thresholds are presentation defaults and should be configurable by product governance before production launch.
