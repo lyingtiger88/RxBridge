@@ -5,8 +5,8 @@ alter table public.habit_plans
   add constraint habit_plans_reminder_times_valid
   check (
     cardinality(reminder_times) <= 8
-    and reminder_times <@ array(
-      select to_char(make_time(h,m,0),'HH24:MI')
-      from generate_series(0,23) h cross join generate_series(0,59) m
+    and (
+      cardinality(reminder_times) = 0
+      or array_to_string(reminder_times, ',') ~ '^([01][0-9]|2[0-3]):[0-5][0-9](,([01][0-9]|2[0-3]):[0-5][0-9])*$'
     )
   );
