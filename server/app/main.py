@@ -11,6 +11,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 
 class Settings(BaseSettings):
@@ -190,6 +191,14 @@ def _norm(value: str) -> str:
     return " ".join(value.casefold().split())
 
 
+def _audit_event(conn, pharmacy_id, actor_user_id, event_type, target_id=None, payload=None):
+    conn.execute("""
+        INSERT INTO pharmacy_audit_events
+          (pharmacy_id, actor_user_id, event_type, target_id, payload)
+        VALUES (%s,%s,%s,%s,%s)
+    """, (pharmacy_id, actor_user_id, event_type, target_id, Jsonb(payload or {})))
+
+
 @app.get("/v1/pharmacies/me")
 def get_my_pharmacy(user=Depends(require_roles("pharmacist"))):
     with connect() as conn:
@@ -238,6 +247,8 @@ def save_my_pharmacy(body: PharmacyProfileInput, user=Depends(require_roles("pha
             RETURNING *
         """, (user["id"], body.pharmacy_name.strip(), body.address.strip(),
               body.phone, body.latitude, body.longitude)).fetchone()
+        _audit_event(conn, row["id"], user["id"], "pharmacy.profile.saved", row["id"],
+                     {"changed_fields": ["pharmacy_name", "address", "phone", "location"]})
     return {"profile": row, "note": "Publication remains disabled until an administrator verifies the pharmacy."}
 
 
@@ -279,6 +290,9 @@ def upsert_pharmacy_inventory(body: PharmacyInventoryInput, user=Depends(require
         """, (profile["id"], body.medicine_name.strip(), body.dosage_form.strip(),
               body.strength.strip(), body.package_label.strip(), body.unit_price,
               body.stock_quantity, body.is_active)).fetchone()
+        _audit_event(conn, profile["id"], user["id"], "inventory.item.upserted", row["id"],
+                     {"medicine_name": row["medicine_name"], "stock_quantity": row["stock_quantity"],
+                      "unit_price": row["unit_price"], "is_active": row["is_active"]})
     return row
 
 
@@ -392,6 +406,9 @@ def set_pharmacy_verification(pharmacy_id: str, body: PharmacyVerificationInput,
             WHERE id=%s
             RETURNING id, user_id, pharmacy_name, verification_status, is_published
         """, (body.verification_status, body.verification_status, pharmacy_id)).fetchone()
+        if row:
+            _audit_event(conn, row["id"], user["id"], "pharmacy.verification.changed", row["id"],
+                         {"verification_status": body.verification_status})
     if not row:
         raise HTTPException(status_code=404, detail="Pharmacy not found")
     return row
@@ -513,6 +530,11 @@ def create_pharmacy_reservation(pharmacy_id: UUID, body: PharmacyReservationInpu
             """, (reservation["id"], candidate["id"], candidate["medicine_name"],
                   candidate["dosage_form"], candidate["strength"], candidate["package_label"],
                   requested.quantity, candidate["unit_price"], line_total))
+        _audit_event(conn, pharmacy_id, user["id"], "reservation.created", reservation["id"],
+                     {"item_count": len(selected), "total_price": sum(
+                         candidate["unit_price"] * requested.quantity
+                         for candidate, requested in selected
+                     )})
         return _reservation_payload(conn, reservation)
 
 
@@ -580,6 +602,8 @@ def confirm_pharmacy_reservation(reservation_id: UUID,
             SET status='confirmed', confirmed_at=now()
             WHERE id=%s
         """, (reservation_id,))
+        _audit_event(conn, pharmacy["id"], user["id"], "reservation.confirmed", reservation_id,
+                     {"item_count": len(lines)})
         reservation = conn.execute(
             "SELECT * FROM pharmacy_reservations WHERE id=%s", (reservation_id,)
         ).fetchone()
@@ -599,6 +623,8 @@ def cancel_pharmacy_reservation(reservation_id: UUID,
         """, (reservation_id, user["id"])).fetchone()
         if not reservation:
             raise HTTPException(status_code=404, detail="Active reservation not found")
+        _audit_event(conn, reservation["pharmacy_id"], user["id"], "reservation.cancelled",
+                     reservation_id, {})
         return _reservation_payload(conn, reservation)
 
 
@@ -623,6 +649,8 @@ def set_my_pharmacy_publication(body: PharmacyPublicationInput,
             if not exists:
                 raise HTTPException(status_code=404, detail="Pharmacy profile not found")
             raise HTTPException(status_code=409, detail="Pharmacy must be verified before publication")
+        _audit_event(conn, row["id"], user["id"], "pharmacy.publication.changed", row["id"],
+                     {"is_published": body.is_published})
         return row
 
 
@@ -637,4 +665,23 @@ def list_pending_pharmacies(user=Depends(require_roles("admin"))):
             ORDER BY created_at ASC
             LIMIT 200
         """).fetchall()
+    return rows
+
+
+
+@app.get("/v1/pharmacies/me/activity")
+def list_pharmacy_activity(user=Depends(require_roles("pharmacist"))):
+    with connect() as conn:
+        pharmacy = conn.execute(
+            "SELECT id FROM pharmacy_profiles WHERE user_id=%s", (user["id"],)
+        ).fetchone()
+        if not pharmacy:
+            return []
+        rows = conn.execute("""
+            SELECT id, actor_user_id, event_type, target_id, payload, created_at
+            FROM pharmacy_audit_events
+            WHERE pharmacy_id=%s
+            ORDER BY created_at DESC
+            LIMIT 100
+        """, (pharmacy["id"],)).fetchall()
     return rows
