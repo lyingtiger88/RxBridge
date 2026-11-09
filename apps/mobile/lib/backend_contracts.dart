@@ -71,12 +71,13 @@ class HabitLogDto {
   final bool completed;
   final int pointsAwarded;
   final DateTime occurredAt;
+  final DateTime? reviewedAt;
   final bool reviewed;
   const HabitLogDto({
     required this.id, required this.planId, required this.patientId,
     required this.rangeResult, required this.doctorFeedback,
     required this.measuredValue, required this.completed,
-    required this.pointsAwarded, required this.occurredAt, required this.reviewed,
+    required this.pointsAwarded, required this.occurredAt, required this.reviewedAt, required this.reviewed,
   });
 }
 
