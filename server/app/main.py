@@ -22,14 +22,92 @@ class Settings(BaseSettings):
     token_minutes: int = 30
     cors_origins: str = "http://localhost:3000,http://localhost:8080"
     staging_mode: bool = True
+    auth_provider: str = "local"
+    supabase_url: str = ""
+    supabase_publishable_key: str = ""
 
 
 settings = Settings()
-if len(settings.jwt_secret) < 32 or settings.jwt_secret == "CHANGE_ME_BEFORE_STARTING":
+if settings.auth_provider not in {"local", "supabase"}:
+    raise RuntimeError("AUTH_PROVIDER must be either local or supabase")
+if settings.auth_provider == "local" and (len(settings.jwt_secret) < 32 or settings.jwt_secret == "CHANGE_ME_BEFORE_STARTING"):
     raise RuntimeError("JWT_SECRET must be a unique random secret of at least 32 characters")
+if settings.auth_provider == "supabase" and (
+    not settings.supabase_url.startswith("https://") or not settings.supabase_publishable_key
+):
+    raise RuntimeError("SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY are required for Supabase authentication")
 app = FastAPI(title="RxBridge Staging API", version="0.1.0")
 oauth2 = OAuth2PasswordBearer(tokenUrl="/v1/auth/token")
 hasher = PasswordHasher()
+_supabase_jwks_client = None
+
+
+def _supabase_issuer() -> str:
+    return settings.supabase_url.rstrip("/") + "/auth/v1"
+
+
+def _verify_supabase_token(token: str) -> dict:
+    """Verify Supabase access tokens; never trust client-supplied role metadata."""
+    global _supabase_jwks_client
+    try:
+        header = jwt.get_unverified_header(token)
+        algorithm = header.get("alg")
+        if algorithm in {"ES256", "RS256"}:
+            if not header.get("kid"):
+                raise ValueError("Missing JWT key identifier")
+            if _supabase_jwks_client is None:
+                _supabase_jwks_client = jwt.PyJWKClient(
+                    settings.supabase_url.rstrip("/") + "/auth/v1/.well-known/jwks.json",
+                    cache_keys=True,
+                    timeout=5,
+                )
+            signing_key = _supabase_jwks_client.get_signing_key_from_jwt(token)
+            claims = jwt.decode(
+                token, signing_key.key, algorithms=[algorithm],
+                issuer=_supabase_issuer(), audience="authenticated",
+                options={"require": ["exp", "iat", "sub", "iss", "aud"]},
+                leeway=30,
+            )
+        elif algorithm == "HS256":
+            # Legacy symmetric keys are verified by Supabase Auth itself.
+            claims = jwt.decode(
+                token,
+                options={
+                    "verify_signature": False, "verify_exp": True,
+                    "verify_iat": True, "verify_aud": False,
+                    "verify_iss": False,
+                    "require": ["exp", "iat", "sub", "iss", "aud"],
+                },
+                leeway=30,
+            )
+            audience = claims.get("aud")
+            if claims.get("iss") != _supabase_issuer() or not (
+                audience == "authenticated" or
+                isinstance(audience, list) and "authenticated" in audience
+            ):
+                raise ValueError("Invalid Supabase token issuer or audience")
+            response = httpx.get(
+                _supabase_issuer() + "/user",
+                headers={
+                    "apikey": settings.supabase_publishable_key,
+                    "Authorization": f"Bearer {token}",
+                },
+                timeout=5.0,
+            )
+            if response.status_code != 200:
+                raise ValueError("Supabase Auth rejected the access token")
+            auth_user = response.json()
+            if str(auth_user.get("id")) != str(claims["sub"]):
+                raise ValueError("Supabase user identity mismatch")
+        else:
+            raise ValueError("Unsupported Supabase JWT algorithm")
+        if claims.get("role") != "authenticated":
+            raise ValueError("Token is not an authenticated user session")
+        UUID(str(claims["sub"]))
+        return claims
+    except (jwt.InvalidTokenError, ValueError, KeyError, httpx.HTTPError) as exc:
+        raise HTTPException(status_code=401, detail="Invalid or expired Supabase access token") from exc
+
 
 
 def connect():
@@ -37,13 +115,17 @@ def connect():
 
 
 def current_user(token: Annotated[str, Depends(oauth2)]):
-    try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"], issuer=settings.jwt_issuer)
-        uid = payload.get("sub")
-        if not uid:
-            raise ValueError("missing subject")
-    except (jwt.InvalidTokenError, ValueError):
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    if settings.auth_provider == "supabase":
+        payload = _verify_supabase_token(token)
+        uid = payload["sub"]
+    else:
+        try:
+            payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"], issuer=settings.jwt_issuer)
+            uid = payload.get("sub")
+            if not uid:
+                raise ValueError("missing subject")
+        except (jwt.InvalidTokenError, ValueError):
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
     with connect() as conn:
         row = conn.execute(
             "SELECT id, username, role, display_name, active FROM app_users WHERE id=%s", (uid,)
@@ -73,6 +155,8 @@ def health():
 
 @app.post("/v1/auth/token")
 def login(form: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    if settings.auth_provider == "supabase":
+        raise HTTPException(status_code=404, detail="Use Supabase Auth sign-in from the client")
     with connect() as conn:
         user = conn.execute(
             "SELECT id, username, role, display_name, password_hash, active FROM app_users WHERE username=%s",
