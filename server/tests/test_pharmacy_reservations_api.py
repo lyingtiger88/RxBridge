@@ -238,5 +238,32 @@ class PharmacyReservationApiTests(unittest.TestCase):
         self.assertEqual(patient_inbox.json()["items"][0]["event_type"], "order.accepted")
 
 
+    def test_user_cannot_mark_another_users_notification_read(self):
+        self.create_order(1)
+        other_patient = uuid4()
+        with main.connect() as conn:
+            conn.execute(
+                "INSERT INTO app_users(id,username,password_hash,role,display_name) VALUES (%s,%s,'x','patient','Other patient')",
+                (other_patient, f"ci_other_notify_{other_patient.hex}"),
+            )
+        try:
+            main.app.dependency_overrides[main.current_user] = lambda: {
+                "id": other_patient, "username": "other", "role": "patient",
+                "display_name": "Other", "active": True,
+            }
+            pharmacy_id = self.pharmacy_id
+            with main.connect() as conn:
+                target = conn.execute(
+                    "SELECT id FROM app_notifications WHERE recipient_user_id=%s ORDER BY created_at DESC LIMIT 1",
+                    (self.pharmacist_id,),
+                ).fetchone()
+            result = self.client.post(f"/v1/notifications/{target['id']}/read")
+            self.assertEqual(result.status_code, 404)
+        finally:
+            main.app.dependency_overrides.clear()
+            with main.connect() as conn:
+                conn.execute("DELETE FROM app_users WHERE id=%s", (other_patient,))
+
+
 if __name__ == "__main__":
     unittest.main()
