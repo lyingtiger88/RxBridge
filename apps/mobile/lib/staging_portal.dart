@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'backend_contracts.dart';
 import 'backend_factory.dart';
+import 'care_reminders.dart';
 
 /// Authenticated staging entry point. Never exposes the local demo workspaces.
 class StagingPortal extends StatefulWidget {
@@ -317,6 +318,7 @@ class _HealthyHabitsPanelState extends State<_HealthyHabitsPanel> {
   final feedback = TextEditingController();
   String habitType = 'activity';
   int frequency = 1;
+  List<TimeOfDay> reminderTimes = [const TimeOfDay(hour: 9, minute: 0)];
 
   @override
   void initState() { super.initState(); _load(); }
@@ -346,6 +348,7 @@ class _HealthyHabitsPanelState extends State<_HealthyHabitsPanel> {
         instruction:instruction.text,unitLabel:unit.text,
         targetMin:lo,targetMax:hi,targetDescription:'',
         frequencyPerDay:frequency,
+        reminderTimes:reminderTimes.map((t)=>'${t.hour.toString().padLeft(2,'0')}:${t.minute.toString().padLeft(2,'0')}').toList(),
       );
       title.clear();instruction.clear();await _load();
     } catch(e) {if(mounted)setState(()=>error='ثبت دستور پزشک انجام نشد: $e');}
@@ -362,6 +365,75 @@ class _HealthyHabitsPanelState extends State<_HealthyHabitsPanel> {
       );
       value.clear();await _load();
     } catch(e) {if(mounted)setState(()=>error='ثبت عملکرد انجام نشد: $e');}
+  }
+
+
+  Future<void> _addReminderTime() async {
+    if (reminderTimes.length >= 8) return;
+    final picked = await showTimePicker(context: context, initialTime: const TimeOfDay(hour: 9, minute: 0));
+    if (picked == null || !mounted) return;
+    if (reminderTimes.any((t)=>t.hour==picked.hour && t.minute==picked.minute)) return;
+    setState(() { reminderTimes = [...reminderTimes, picked]..sort((a,b)=>(a.hour*60+a.minute).compareTo(b.hour*60+b.minute)); });
+  }
+  Future<void> _enableReminders(HabitPlanDto plan) async {
+    if (plan.reminderTimes.isEmpty) { setState(()=>error='برای این برنامه هنوز ساعتی توسط پزشک تعیین نشده است.'); return; }
+    try {
+      final enabled = await CareReminders.instance.activateHabitReminders(planId:plan.id,times:plan.reminderTimes);
+      if (!mounted) return;
+      setState(()=>error=enabled?'یادآورها روی همین دستگاه فعال شدند.':'مجوز اعلان داده نشد یا دستگاه پشتیبانی نمی‌کند.');
+    } catch(e) { if(mounted)setState(()=>error='فعال‌سازی یادآور ناموفق بود: $e'); }
+  }
+  Widget _metric(String label,String value) => Column(children:[
+    Text(value,style:const TextStyle(fontSize:19,fontWeight:FontWeight.w800,color:Color(0xFF126D68))),
+    Text(label,style:const TextStyle(fontSize:10,color:Colors.blueGrey)),
+  ]);
+  Widget _progressSummary() {
+    final reviewed=logs.where((x)=>x.reviewed).length;
+    final earned=logs.fold<int>(0,(sum,x)=>sum+x.pointsAwarded);
+    final rate=reviewed==0?0:(earned/reviewed*100).round();
+    return Card(color:const Color(0xFFEAF7F5),child:Padding(padding:const EdgeInsets.all(14),child:Column(
+      crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+        const Text('گزارش پیشرفت',style:TextStyle(fontWeight:FontWeight.w800,fontSize:16)),
+        const SizedBox(height:10),
+        Row(children:[
+          Expanded(child:_metric('ثبت‌ها',logs.length.toString())),
+          Expanded(child:_metric('بازبینی‌شده',reviewed.toString())),
+          Expanded(child:_metric('امتیاز',earned.toString())),
+          Expanded(child:_metric('پایبندی','\${rate}%')),
+        ]),
+        const SizedBox(height:8),
+        ClipRRect(borderRadius:BorderRadius.circular(8),child:LinearProgressIndicator(
+          minHeight:9,value:reviewed==0?0:earned/reviewed,backgroundColor:Colors.white,color:Colors.teal)),
+        const Text('درصد فقط از گزارش‌های بازبینی‌شده محاسبه می‌شود.',style:TextStyle(fontSize:10,color:Colors.blueGrey)),
+      ],
+    )));
+  }
+  Widget _weeklyCalendar() {
+    final today=DateUtils.dateOnly(DateTime.now());
+    final days=List.generate(7,(i)=>today.subtract(Duration(days:6-i)));
+    final labels=['دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه','یکشنبه'];
+    return Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(
+      crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+        const Text('تقویم هفتگی عادات',style:TextStyle(fontWeight:FontWeight.w800,fontSize:16)),
+        const SizedBox(height:10),
+        Row(children:days.map((day){
+          final count=logs.where((l)=>DateUtils.isSameDay(l.occurredAt.toLocal(),day)).length;
+          final index=(day.weekday+6)%7;
+          return Expanded(child:Padding(padding:const EdgeInsets.symmetric(horizontal:2),child:Column(children:[
+            Text(labels[index].substring(0,2),style:const TextStyle(fontSize:9,color:Colors.blueGrey)),
+            const SizedBox(height:5),
+            Container(width:31,height:34,alignment:Alignment.center,
+              decoration:BoxDecoration(color:count>0?const Color(0xFFBDEAE2):const Color(0xFFF0F3F5),borderRadius:BorderRadius.circular(9)),
+              child:Text('\${day.day}',style:const TextStyle(fontWeight:FontWeight.w700,fontSize:11))),
+            const SizedBox(height:4),
+            Icon(count>0?Icons.check_circle_rounded:Icons.circle_outlined,size:13,color:count>0?Colors.teal:Colors.black26),
+          ])));
+        }).toList()),
+        const SizedBox(height:6),
+        const Text('نشانگر سبز یعنی حداقل یک گزارش در آن روز ثبت شده است؛ تأیید پزشک جداگانه محاسبه می‌شود.',
+          style:TextStyle(fontSize:10,color:Colors.blueGrey)),
+      ],
+    )));
   }
 
   Future<void> _review(HabitLogDto log) async {
@@ -418,13 +490,25 @@ class _HealthyHabitsPanelState extends State<_HealthyHabitsPanel> {
             items:List.generate(24,(i)=>DropdownMenuItem(value:i+1,child:Text('${i+1} بار'))),
             onChanged:(v){if(v!=null)setState(()=>frequency=v);}),
           const SizedBox(height:8),
+          const Text('ساعت‌های یادآوری روزانه',style:TextStyle(fontWeight:FontWeight.w600)),
+          Wrap(spacing:6,runSpacing:4,children:[
+            for(final time in reminderTimes) InputChip(label:Text(time.format(context)),onDeleted:()=>setState(()=>reminderTimes.remove(time))),
+            ActionChip(avatar:const Icon(Icons.add_alarm_rounded,size:18),label:const Text('افزودن ساعت'),onPressed:_addReminderTime),
+          ]),
+          const SizedBox(height:8),
           FilledButton(onPressed:busy?null:_createPlan,child:const Text('ثبت دستور برای بیمار')),
         ],
         const Divider(height:28),
+        if(plans.isNotEmpty) _progressSummary(),
+        if(plans.isNotEmpty) _weeklyCalendar(),
         for(final plan in plans) ...[
           ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.track_changes_rounded,color:Colors.teal),
             title:Text(plan.title,style:const TextStyle(fontWeight:FontWeight.bold)),
             subtitle:Text('${plan.instruction}\nمحدوده مورد تأیید: ${plan.targetMin??'—'} تا ${plan.targetMax??'—'} ${plan.unitLabel} • ${plan.frequencyPerDay} نوبت در روز')),
+          if(widget.role=='patient' && plan.reminderTimes.isNotEmpty) Align(
+            alignment:Alignment.centerRight,
+            child:TextButton.icon(onPressed:()=>_enableReminders(plan),icon:const Icon(Icons.notifications_active_outlined),label:Text('فعال‌سازی یادآورها: ${plan.reminderTimes.join('، ')}')),
+          ),
           if(widget.role=='patient') Row(children:[
             Expanded(child:TextField(controller:value,keyboardType:TextInputType.number,decoration:InputDecoration(labelText:'مقدار انجام‌شده (${plan.unitLabel})'))),
             const SizedBox(width:8),
