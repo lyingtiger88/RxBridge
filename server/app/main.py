@@ -138,6 +138,7 @@ def root():
 
 
 import math
+from uuid import UUID
 from pydantic import Field
 
 class PharmacyProfileInput(BaseModel):
@@ -276,10 +277,17 @@ def search_pharmacies(body: PharmacySearchRequest, user=Depends(require_roles("p
             if distance > body.radius_km:
                 continue
             inventory = conn.execute("""
-                SELECT medicine_name, dosage_form, strength, package_label,
-                       unit_price, stock_quantity, updated_at
-                FROM pharmacy_inventory
-                WHERE pharmacy_id=%s AND is_active=TRUE
+                SELECT i.medicine_name, i.dosage_form, i.strength, i.package_label,
+                       i.unit_price, i.stock_quantity,
+                       GREATEST(i.stock_quantity - COALESCE((
+                         SELECT SUM(ri.quantity)
+                         FROM pharmacy_reservation_items ri
+                         JOIN pharmacy_reservations r ON r.id=ri.reservation_id
+                         WHERE ri.inventory_id=i.id AND r.status='held' AND r.expires_at > now()
+                       ),0),0) AS available_quantity,
+                       i.updated_at
+                FROM pharmacy_inventory i
+                WHERE i.pharmacy_id=%s AND i.is_active=TRUE
                 ORDER BY updated_at DESC, id
             """, (pharmacy["id"],)).fetchall()
             matched = []
@@ -296,15 +304,15 @@ def search_pharmacies(body: PharmacySearchRequest, user=Depends(require_roles("p
                     and _norm(item["package_label"]) == _norm(requested.package_label)]
                 # Exact deterministic match; do not silently substitute a different medicine or pack.
                 candidate = candidates[0] if candidates else None
-                if candidate is None or candidate["stock_quantity"] < requested.quantity:
+                if candidate is None or candidate["available_quantity"] < requested.quantity:
                     complete = False
                     missing.append({
                         "medicine_name": requested.medicine_name,
                         "requested_quantity": requested.quantity,
-                        "available_quantity": 0 if candidate is None else candidate["stock_quantity"],
+                        "available_quantity": 0 if candidate is None else candidate["available_quantity"],
                     })
                     if candidate is not None:
-                        available_subtotal += candidate["unit_price"] * min(candidate["stock_quantity"], requested.quantity)
+                        available_subtotal += candidate["unit_price"] * min(candidate["available_quantity"], requested.quantity)
                     continue
                 line_total = candidate["unit_price"] * requested.quantity
                 available_subtotal += line_total
@@ -366,3 +374,197 @@ def set_pharmacy_verification(pharmacy_id: str, body: PharmacyVerificationInput,
     if not row:
         raise HTTPException(status_code=404, detail="Pharmacy not found")
     return row
+
+
+class PharmacyReservationInput(BaseModel):
+    idempotency_key: UUID
+    items: list[PrescriptionSearchItem] = Field(min_length=1, max_length=100)
+
+
+def _reservation_payload(conn, reservation):
+    lines = conn.execute("""
+        SELECT medicine_name, dosage_form, strength, package_label,
+               quantity, unit_price, line_total
+        FROM pharmacy_reservation_items
+        WHERE reservation_id=%s ORDER BY medicine_name
+    """, (reservation["id"],)).fetchall()
+    return {
+        "id": str(reservation["id"]),
+        "pharmacy_id": str(reservation["pharmacy_id"]),
+        "status": reservation["status"],
+        "expires_at": reservation["expires_at"],
+        "created_at": reservation["created_at"],
+        "confirmed_at": reservation["confirmed_at"],
+        "cancelled_at": reservation["cancelled_at"],
+        "items": lines,
+        "total_price": sum(line["line_total"] for line in lines),
+        "synthetic_data_only": settings.staging_mode,
+    }
+
+
+@app.post("/v1/pharmacies/{pharmacy_id}/reservations", status_code=201)
+def create_pharmacy_reservation(pharmacy_id: UUID, body: PharmacyReservationInput,
+                                user=Depends(require_roles("patient"))):
+    with connect() as conn:
+        existing = conn.execute("""
+            SELECT * FROM pharmacy_reservations
+            WHERE patient_user_id=%s AND idempotency_key=%s
+        """, (user["id"], body.idempotency_key)).fetchone()
+        if existing:
+            return _reservation_payload(conn, existing)
+
+        pharmacy = conn.execute("""
+            SELECT id FROM pharmacy_profiles
+            WHERE id=%s AND is_published=TRUE AND verification_status='verified'
+            FOR SHARE
+        """, (pharmacy_id,)).fetchone()
+        if not pharmacy:
+            raise HTTPException(status_code=404, detail="Verified pharmacy not found")
+
+        # Lock inventory rows in a stable order to serialize competing reservations.
+        inventory = conn.execute("""
+            SELECT id, medicine_name, dosage_form, strength, package_label,
+                   unit_price, stock_quantity
+            FROM pharmacy_inventory
+            WHERE pharmacy_id=%s AND is_active=TRUE
+            ORDER BY id
+            FOR UPDATE
+        """, (pharmacy_id,)).fetchall()
+
+        selected = []
+        seen = set()
+        for requested in body.items:
+            key = tuple(_norm(v) for v in (
+                requested.medicine_name, requested.dosage_form,
+                requested.strength, requested.package_label
+            ))
+            if key in seen:
+                raise HTTPException(status_code=422, detail="Duplicate prescription item; combine quantities")
+            seen.add(key)
+            candidate = next((row for row in inventory if tuple(_norm(row[k]) for k in (
+                "medicine_name", "dosage_form", "strength", "package_label"
+            )) == key), None)
+            if candidate is None:
+                raise HTTPException(status_code=409, detail=f"Medicine unavailable: {requested.medicine_name}")
+            held = conn.execute("""
+                SELECT COALESCE(SUM(ri.quantity),0) AS quantity
+                FROM pharmacy_reservation_items ri
+                JOIN pharmacy_reservations r ON r.id=ri.reservation_id
+                WHERE ri.inventory_id=%s AND r.status='held' AND r.expires_at > now()
+            """, (candidate["id"],)).fetchone()["quantity"]
+            available = candidate["stock_quantity"] - held
+            if available < requested.quantity:
+                raise HTTPException(status_code=409, detail=f"Insufficient stock: {requested.medicine_name}")
+            selected.append((candidate, requested))
+
+        reservation = conn.execute("""
+            INSERT INTO pharmacy_reservations
+              (pharmacy_id, patient_user_id, idempotency_key)
+            VALUES (%s,%s,%s)
+            ON CONFLICT (patient_user_id,idempotency_key) DO NOTHING
+            RETURNING *
+        """, (pharmacy_id, user["id"], body.idempotency_key)).fetchone()
+        if reservation is None:
+            reservation = conn.execute("""
+                SELECT * FROM pharmacy_reservations
+                WHERE patient_user_id=%s AND idempotency_key=%s
+            """, (user["id"], body.idempotency_key)).fetchone()
+            return _reservation_payload(conn, reservation)
+
+        for candidate, requested in selected:
+            line_total = candidate["unit_price"] * requested.quantity
+            conn.execute("""
+                INSERT INTO pharmacy_reservation_items
+                  (reservation_id, inventory_id, medicine_name, dosage_form,
+                   strength, package_label, quantity, unit_price, line_total)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (reservation["id"], candidate["id"], candidate["medicine_name"],
+                  candidate["dosage_form"], candidate["strength"], candidate["package_label"],
+                  requested.quantity, candidate["unit_price"], line_total))
+    return _reservation_payload(conn, reservation)
+
+
+@app.get("/v1/pharmacies/reservations/me")
+def list_patient_reservations(user=Depends(require_roles("patient"))):
+    with connect() as conn:
+        rows = conn.execute("""
+            SELECT * FROM pharmacy_reservations
+            WHERE patient_user_id=%s ORDER BY created_at DESC LIMIT 100
+        """, (user["id"],)).fetchall()
+        return [_reservation_payload(conn, row) for row in rows]
+
+
+@app.get("/v1/pharmacies/me/reservations")
+def list_pharmacy_reservations(user=Depends(require_roles("pharmacist"))):
+    with connect() as conn:
+        pharmacy = conn.execute(
+            "SELECT id FROM pharmacy_profiles WHERE user_id=%s", (user["id"],)
+        ).fetchone()
+        if not pharmacy:
+            return []
+        rows = conn.execute("""
+            SELECT * FROM pharmacy_reservations
+            WHERE pharmacy_id=%s ORDER BY created_at DESC LIMIT 100
+        """, (pharmacy["id"],)).fetchall()
+        return [_reservation_payload(conn, row) for row in rows]
+
+
+@app.post("/v1/pharmacies/reservations/{reservation_id}/confirm")
+def confirm_pharmacy_reservation(reservation_id: UUID,
+                                 user=Depends(require_roles("pharmacist"))):
+    with connect() as conn:
+        pharmacy = conn.execute(
+            "SELECT id FROM pharmacy_profiles WHERE user_id=%s", (user["id"],)
+        ).fetchone()
+        if not pharmacy:
+            raise HTTPException(status_code=404, detail="Pharmacy profile not found")
+        reservation = conn.execute("""
+            SELECT * FROM pharmacy_reservations
+            WHERE id=%s AND pharmacy_id=%s FOR UPDATE
+        """, (reservation_id, pharmacy["id"])).fetchone()
+        if not reservation:
+            raise HTTPException(status_code=404, detail="Reservation not found")
+        if reservation["status"] != "held":
+            raise HTTPException(status_code=409, detail="Reservation is not active")
+        if reservation["expires_at"] <= datetime.now(timezone.utc):
+            conn.execute("UPDATE pharmacy_reservations SET status='expired' WHERE id=%s",
+                         (reservation_id,))
+            raise HTTPException(status_code=409, detail="Reservation has expired")
+        lines = conn.execute("""
+            SELECT inventory_id, quantity FROM pharmacy_reservation_items
+            WHERE reservation_id=%s ORDER BY inventory_id
+        """, (reservation_id,)).fetchall()
+        for line in lines:
+            updated = conn.execute("""
+                UPDATE pharmacy_inventory
+                SET stock_quantity=stock_quantity-%s, updated_at=now()
+                WHERE id=%s AND stock_quantity >= %s
+                RETURNING id
+            """, (line["quantity"], line["inventory_id"], line["quantity"])).fetchone()
+            if not updated:
+                raise HTTPException(status_code=409, detail="Inventory changed; reservation cannot be confirmed")
+        conn.execute("""
+            UPDATE pharmacy_reservations
+            SET status='confirmed', confirmed_at=now()
+            WHERE id=%s
+        """, (reservation_id,))
+        reservation = conn.execute(
+            "SELECT * FROM pharmacy_reservations WHERE id=%s", (reservation_id,)
+        ).fetchone()
+        return _reservation_payload(conn, reservation)
+
+
+@app.post("/v1/pharmacies/reservations/{reservation_id}/cancel")
+def cancel_pharmacy_reservation(reservation_id: UUID,
+                                user=Depends(require_roles("patient"))):
+    with connect() as conn:
+        reservation = conn.execute("""
+            UPDATE pharmacy_reservations
+            SET status='cancelled', cancelled_at=now()
+            WHERE id=%s AND patient_user_id=%s AND status='held'
+              AND expires_at > now()
+            RETURNING *
+        """, (reservation_id, user["id"])).fetchone()
+        if not reservation:
+            raise HTTPException(status_code=404, detail="Active reservation not found")
+        return _reservation_payload(conn, reservation)
