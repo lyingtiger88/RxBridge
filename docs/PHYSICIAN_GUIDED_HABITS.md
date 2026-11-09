@@ -20,3 +20,13 @@
 
 ## Apply
 Run `infra/supabase/migrations/0004_physician_habit_programs.sql` after migrations 0001–0003 in the isolated staging project. Then use doctor and patient accounts linked by active patient_access and clinical_record consent.
+
+## Added schedule, calendar and progress features
+- A physician can attach up to eight daily local-time reminder slots to a habit plan.
+- The patient explicitly enables OS notifications on their own device; the app asks for notification permission.
+- Notifications use generic lock-screen wording and do not reveal the habit or health data.
+- Reminders are local to the patient's device; they are not sent by a server and are not proof of completion.
+- The weekly calendar visualizes self-reported log entries for the last seven local days.
+- The progress summary reports submitted logs, doctor-reviewed logs, approved points, and adherence percentage among reviewed logs only.
+- Pending logs are excluded from the adherence denominator. Out-of-range and missed reports remain zero-point and require clinician feedback.
+- Time-zone scheduling uses the device's current local time zone. Patients must re-enable reminders after reinstalling the app or changing devices.
