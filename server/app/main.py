@@ -217,7 +217,13 @@ def save_my_pharmacy(body: PharmacyProfileInput, user=Depends(require_roles("pha
               phone=EXCLUDED.phone,
               latitude=EXCLUDED.latitude,
               longitude=EXCLUDED.longitude,
-              is_published=(EXCLUDED.is_published AND pharmacy_profiles.verification_status='verified'),
+              is_published=CASE
+                WHEN pharmacy_profiles.latitude IS DISTINCT FROM EXCLUDED.latitude
+                  OR pharmacy_profiles.longitude IS DISTINCT FROM EXCLUDED.longitude
+                  OR pharmacy_profiles.address IS DISTINCT FROM EXCLUDED.address
+                THEN FALSE
+                ELSE (EXCLUDED.is_published AND pharmacy_profiles.verification_status='verified')
+              END,
               verification_status=CASE
                 WHEN pharmacy_profiles.latitude IS DISTINCT FROM EXCLUDED.latitude
                   OR pharmacy_profiles.longitude IS DISTINCT FROM EXCLUDED.longitude
@@ -274,6 +280,7 @@ def search_pharmacies(body: PharmacySearchRequest, user=Depends(require_roles("p
                        unit_price, stock_quantity, updated_at
                 FROM pharmacy_inventory
                 WHERE pharmacy_id=%s AND is_active=TRUE
+                ORDER BY updated_at DESC, id
             """, (pharmacy["id"],)).fetchall()
             matched = []
             missing = []
