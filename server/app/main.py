@@ -199,6 +199,43 @@ def _audit_event(conn, pharmacy_id, actor_user_id, event_type, target_id=None, p
     """, (pharmacy_id, actor_user_id, event_type, target_id, Jsonb(payload or {})))
 
 
+def _notify(conn, recipient_user_id, actor_user_id, event_type, title, body, entity_type, entity_id):
+    conn.execute("""
+        INSERT INTO app_notifications
+          (recipient_user_id, actor_user_id, event_type, title, body, entity_type, entity_id)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
+    """, (recipient_user_id, actor_user_id, event_type, title, body, entity_type, entity_id))
+
+
+@app.get("/v1/notifications/me")
+def list_my_notifications(user=Depends(current_user)):
+    with connect() as conn:
+        rows = conn.execute("""
+            SELECT id, event_type, title, body, entity_type, entity_id, read_at, created_at
+            FROM app_notifications
+            WHERE recipient_user_id=%s
+            ORDER BY created_at DESC LIMIT 100
+        """, (user["id"],)).fetchall()
+        unread = conn.execute("""
+            SELECT count(*) AS count FROM app_notifications
+            WHERE recipient_user_id=%s AND read_at IS NULL
+        """, (user["id"],)).fetchone()["count"]
+    return {"items": rows, "unread_count": unread}
+
+
+@app.post("/v1/notifications/{notification_id}/read")
+def mark_notification_read(notification_id: UUID, user=Depends(current_user)):
+    with connect() as conn:
+        row = conn.execute("""
+            UPDATE app_notifications SET read_at=COALESCE(read_at,now())
+            WHERE id=%s AND recipient_user_id=%s
+            RETURNING id, read_at
+        """, (notification_id, user["id"])).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return row
+
+
 @app.get("/v1/pharmacies/me")
 def get_my_pharmacy(user=Depends(require_roles("pharmacist"))):
     with connect() as conn:
@@ -754,6 +791,13 @@ def create_pharmacy_order(body: PharmacyOrderCreateInput, response: Response,
               body.patient_note.strip())).fetchone()
         _audit_event(conn, reservation["pharmacy_id"], user["id"], "order.submitted",
                      order["id"], {"reservation_id": str(reservation["id"])})
+        pharmacy_owner = conn.execute(
+            "SELECT user_id FROM pharmacy_profiles WHERE id=%s", (reservation["pharmacy_id"],)
+        ).fetchone()
+        if pharmacy_owner:
+            _notify(conn, pharmacy_owner["user_id"], user["id"], "order.submitted",
+                    "سفارش جدید", "یک سفارش جدید برای بررسی ثبت شده است.",
+                    "pharmacy_order", order["id"])
         return _order_payload(conn, order)
 
 
@@ -807,6 +851,9 @@ def transition_pharmacy_order(order_id: UUID, body: PharmacyOrderTransitionInput
             """, (order_id,))
             _audit_event(conn, order["pharmacy_id"], user["id"], "order.dispensed",
                          order_id, {})
+            _notify(conn, order["patient_user_id"], user["id"], "order.dispensed",
+                    "تحویل سفارش ثبت شد", "دریافت سفارش شما ثبت شد.",
+                    "pharmacy_order", order_id)
         elif body.action == "cancel":
             if user["role"] == "patient":
                 if str(order["patient_user_id"]) != str(user["id"]) or order["status"] != "submitted":
@@ -840,6 +887,9 @@ def transition_pharmacy_order(order_id: UUID, body: PharmacyOrderTransitionInput
             """, (body.pharmacy_note.strip(), order_id))
             _audit_event(conn, order["pharmacy_id"], user["id"], "order.cancelled",
                          order_id, {"previous_status": order["status"]})
+            _notify(conn, order["patient_user_id"], user["id"], "order.cancelled",
+                    "سفارش لغو شد", "وضعیت سفارش شما به لغوشده تغییر کرد.",
+                    "pharmacy_order", order_id)
         else:
             if user["role"] != "pharmacist":
                 raise HTTPException(status_code=403, detail="Only the pharmacy can change fulfilment status")
@@ -889,6 +939,14 @@ def transition_pharmacy_order(order_id: UUID, body: PharmacyOrderTransitionInput
             """, (new_status, body.pharmacy_note.strip(), order_id))
             _audit_event(conn, order["pharmacy_id"], user["id"], f"order.{new_status}",
                          order_id, {})
+            patient_messages = {
+                "accepted": ("سفارش پذیرفته شد", "داروخانه سفارش شما را پذیرفته است."),
+                "preparing": ("سفارش در حال آماده‌سازی", "آماده‌سازی سفارش شما آغاز شده است."),
+                "ready": ("سفارش آماده تحویل است", "برای دریافت سفارش با داروخانه هماهنگ کنید."),
+            }
+            title, message = patient_messages[new_status]
+            _notify(conn, order["patient_user_id"], user["id"], f"order.{new_status}",
+                    title, message, "pharmacy_order", order_id)
         updated_order = conn.execute(
             "SELECT * FROM pharmacy_orders WHERE id=%s", (order_id,)
         ).fetchone()
