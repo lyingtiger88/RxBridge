@@ -685,3 +685,211 @@ def list_pharmacy_activity(user=Depends(require_roles("pharmacist"))):
             LIMIT 100
         """, (pharmacy["id"],)).fetchall()
     return rows
+
+
+class PharmacyOrderCreateInput(BaseModel):
+    reservation_id: UUID
+    patient_note: str = Field(default="", max_length=1000)
+
+
+class PharmacyOrderTransitionInput(BaseModel):
+    action: str = Field(pattern="^(accept|start_preparing|mark_ready|dispense|cancel)$")
+    pharmacy_note: str = Field(default="", max_length=1000)
+
+
+def _order_payload(conn, order):
+    lines = conn.execute("""
+        SELECT medicine_name, dosage_form, strength, package_label,
+               quantity, unit_price, line_total
+        FROM pharmacy_reservation_items
+        WHERE reservation_id=%s ORDER BY medicine_name
+    """, (order["reservation_id"],)).fetchall()
+    return {
+        "id": str(order["id"]),
+        "reservation_id": str(order["reservation_id"]),
+        "pharmacy_id": str(order["pharmacy_id"]),
+        "patient_user_id": str(order["patient_user_id"]),
+        "status": order["status"],
+        "patient_note": order["patient_note"],
+        "pharmacy_note": order["pharmacy_note"],
+        "submitted_at": order["submitted_at"],
+        "accepted_at": order["accepted_at"],
+        "preparing_at": order["preparing_at"],
+        "ready_at": order["ready_at"],
+        "dispensed_at": order["dispensed_at"],
+        "cancelled_at": order["cancelled_at"],
+        "updated_at": order["updated_at"],
+        "items": lines,
+        "total_price": sum(line["line_total"] for line in lines),
+        "synthetic_data_only": settings.staging_mode,
+    }
+
+
+@app.post("/v1/pharmacies/orders", status_code=201)
+def create_pharmacy_order(body: PharmacyOrderCreateInput, response: Response,
+                           user=Depends(require_roles("patient"))):
+    with connect() as conn:
+        reservation = conn.execute("""
+            SELECT * FROM pharmacy_reservations
+            WHERE id=%s AND patient_user_id=%s
+            FOR UPDATE
+        """, (body.reservation_id, user["id"])).fetchone()
+        if not reservation:
+            raise HTTPException(status_code=404, detail="Reservation not found")
+        existing = conn.execute(
+            "SELECT * FROM pharmacy_orders WHERE reservation_id=%s",
+            (body.reservation_id,)
+        ).fetchone()
+        if existing:
+            response.status_code = 200
+            return _order_payload(conn, existing)
+        if reservation["status"] != "held" or reservation["expires_at"] <= datetime.now(timezone.utc):
+            raise HTTPException(status_code=409, detail="Only an active reservation can become an order")
+        order = conn.execute("""
+            INSERT INTO pharmacy_orders
+              (reservation_id, pharmacy_id, patient_user_id, patient_note)
+            VALUES (%s,%s,%s,%s)
+            RETURNING *
+        """, (reservation["id"], reservation["pharmacy_id"], user["id"],
+              body.patient_note.strip())).fetchone()
+        _audit_event(conn, reservation["pharmacy_id"], user["id"], "order.submitted",
+                     order["id"], {"reservation_id": str(reservation["id"])})
+        return _order_payload(conn, order)
+
+
+@app.get("/v1/pharmacies/orders/me")
+def list_my_pharmacy_orders(user=Depends(require_roles("patient"))):
+    with connect() as conn:
+        orders = conn.execute("""
+            SELECT * FROM pharmacy_orders
+            WHERE patient_user_id=%s ORDER BY submitted_at DESC LIMIT 100
+        """, (user["id"],)).fetchall()
+        return [_order_payload(conn, order) for order in orders]
+
+
+@app.get("/v1/pharmacies/me/orders")
+def list_incoming_pharmacy_orders(user=Depends(require_roles("pharmacist"))):
+    with connect() as conn:
+        pharmacy = conn.execute(
+            "SELECT id FROM pharmacy_profiles WHERE user_id=%s", (user["id"],)
+        ).fetchone()
+        if not pharmacy:
+            return []
+        orders = conn.execute("""
+            SELECT * FROM pharmacy_orders
+            WHERE pharmacy_id=%s ORDER BY submitted_at DESC LIMIT 100
+        """, (pharmacy["id"],)).fetchall()
+        return [_order_payload(conn, order) for order in orders]
+
+
+@app.post("/v1/pharmacies/orders/{order_id}/transition")
+def transition_pharmacy_order(order_id: UUID, body: PharmacyOrderTransitionInput,
+                              user=Depends(current_user)):
+    if user["role"] not in {"patient", "pharmacist"}:
+        raise HTTPException(status_code=403, detail="Insufficient role")
+    with connect() as conn:
+        order = conn.execute(
+            "SELECT * FROM pharmacy_orders WHERE id=%s FOR UPDATE",
+            (order_id,)
+        ).fetchone()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        if body.action == "dispense":
+            if user["role"] != "patient" or str(order["patient_user_id"]) != str(user["id"]):
+                raise HTTPException(status_code=403, detail="Only the ordering patient can confirm pickup")
+            if order["status"] != "ready":
+                raise HTTPException(status_code=409, detail="Order is not ready for pickup")
+            new_status = "dispensed"
+            conn.execute("""
+                UPDATE pharmacy_orders SET status='dispensed', dispensed_at=now(),
+                  updated_at=now() WHERE id=%s
+            """, (order_id,))
+            _audit_event(conn, order["pharmacy_id"], user["id"], "order.dispensed",
+                         order_id, {})
+        elif body.action == "cancel":
+            if user["role"] == "patient":
+                if str(order["patient_user_id"]) != str(user["id"]) or order["status"] != "submitted":
+                    raise HTTPException(status_code=403, detail="Patient can cancel only an unaccepted order")
+            else:
+                pharmacy = conn.execute(
+                    "SELECT id FROM pharmacy_profiles WHERE user_id=%s", (user["id"],)
+                ).fetchone()
+                if not pharmacy or str(pharmacy["id"]) != str(order["pharmacy_id"]):
+                    raise HTTPException(status_code=403, detail="Order belongs to another pharmacy")
+                if order["status"] not in {"submitted", "accepted", "preparing", "ready"}:
+                    raise HTTPException(status_code=409, detail="Order cannot be cancelled")
+            if order["status"] in {"accepted", "preparing", "ready"}:
+                lines = conn.execute("""
+                    SELECT inventory_id, quantity FROM pharmacy_reservation_items
+                    WHERE reservation_id=%s ORDER BY inventory_id
+                """, (order["reservation_id"],)).fetchall()
+                for line in lines:
+                    conn.execute("""
+                        UPDATE pharmacy_inventory
+                        SET stock_quantity=stock_quantity+%s, updated_at=now()
+                        WHERE id=%s
+                    """, (line["quantity"], line["inventory_id"]))
+            conn.execute("""
+                UPDATE pharmacy_reservations SET status='cancelled', cancelled_at=now()
+                WHERE id=%s AND status IN ('held','confirmed')
+            """, (order["reservation_id"],))
+            conn.execute("""
+                UPDATE pharmacy_orders SET status='cancelled', cancelled_at=now(),
+                  pharmacy_note=%s, updated_at=now() WHERE id=%s
+            """, (body.pharmacy_note.strip(), order_id))
+            _audit_event(conn, order["pharmacy_id"], user["id"], "order.cancelled",
+                         order_id, {"previous_status": order["status"]})
+        else:
+            if user["role"] != "pharmacist":
+                raise HTTPException(status_code=403, detail="Only the pharmacy can change fulfilment status")
+            pharmacy = conn.execute(
+                "SELECT id FROM pharmacy_profiles WHERE user_id=%s", (user["id"],)
+            ).fetchone()
+            if not pharmacy or str(pharmacy["id"]) != str(order["pharmacy_id"]):
+                raise HTTPException(status_code=403, detail="Order belongs to another pharmacy")
+            transitions = {
+                ("submitted", "accept"): "accepted",
+                ("accepted", "start_preparing"): "preparing",
+                ("preparing", "mark_ready"): "ready",
+            }
+            new_status = transitions.get((order["status"], body.action))
+            if not new_status:
+                raise HTTPException(status_code=409, detail="Invalid order status transition")
+            if body.action == "accept":
+                reservation = conn.execute("""
+                    SELECT * FROM pharmacy_reservations WHERE id=%s FOR UPDATE
+                """, (order["reservation_id"],)).fetchone()
+                if reservation["status"] != "held" or reservation["expires_at"] <= datetime.now(timezone.utc):
+                    raise HTTPException(status_code=409, detail="Reservation expired before pharmacy acceptance")
+                lines = conn.execute("""
+                    SELECT inventory_id, quantity FROM pharmacy_reservation_items
+                    WHERE reservation_id=%s ORDER BY inventory_id
+                """, (order["reservation_id"],)).fetchall()
+                for line in lines:
+                    updated = conn.execute("""
+                        UPDATE pharmacy_inventory SET stock_quantity=stock_quantity-%s,
+                          updated_at=now()
+                        WHERE id=%s AND stock_quantity >= %s RETURNING id
+                    """, (line["quantity"], line["inventory_id"], line["quantity"])).fetchone()
+                    if not updated:
+                        raise HTTPException(status_code=409, detail="Inventory changed; cannot accept order")
+                conn.execute("""
+                    UPDATE pharmacy_reservations SET status='confirmed', confirmed_at=now()
+                    WHERE id=%s
+                """, (order["reservation_id"],))
+                timestamp_field = "accepted_at"
+            elif body.action == "start_preparing":
+                timestamp_field = "preparing_at"
+            else:
+                timestamp_field = "ready_at"
+            conn.execute(f"""
+                UPDATE pharmacy_orders SET status=%s, {timestamp_field}=now(),
+                  pharmacy_note=%s, updated_at=now() WHERE id=%s
+            """, (new_status, body.pharmacy_note.strip(), order_id))
+            _audit_event(conn, order["pharmacy_id"], user["id"], f"order.{new_status}",
+                         order_id, {})
+        updated_order = conn.execute(
+            "SELECT * FROM pharmacy_orders WHERE id=%s", (order_id,)
+        ).fetchone()
+        return _order_payload(conn, updated_order)
