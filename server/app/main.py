@@ -249,6 +249,23 @@ def upsert_pharmacy_inventory(body: PharmacyInventoryInput, user=Depends(require
         ).fetchone()
         if not profile:
             raise HTTPException(status_code=409, detail="Create the pharmacy profile first")
+        existing = conn.execute("""
+            SELECT id FROM pharmacy_inventory
+            WHERE pharmacy_id=%s AND lower(medicine_name)=lower(%s)
+              AND lower(dosage_form)=lower(%s) AND lower(strength)=lower(%s)
+              AND lower(package_label)=lower(%s)
+            FOR UPDATE
+        """, (profile["id"], body.medicine_name.strip(), body.dosage_form.strip(),
+              body.strength.strip(), body.package_label.strip())).fetchone()
+        if existing:
+            held = conn.execute("""
+                SELECT COALESCE(SUM(ri.quantity),0) AS quantity
+                FROM pharmacy_reservation_items ri
+                JOIN pharmacy_reservations r ON r.id=ri.reservation_id
+                WHERE ri.inventory_id=%s AND r.status='held' AND r.expires_at > now()
+            """, (existing["id"],)).fetchone()["quantity"]
+            if body.stock_quantity < held:
+                raise HTTPException(status_code=409, detail="Stock cannot be reduced below active reservation holds")
         row = conn.execute("""
             INSERT INTO pharmacy_inventory
               (pharmacy_id, medicine_name, dosage_form, strength, package_label,
