@@ -1,3 +1,4 @@
+// ignore_for_file: prefer_interpolation_to_compose_strings, curly_braces_in_flow_control_structures
 import 'package:flutter/material.dart';
 
 const _phInk=Color(0xFF183247), _phNavy=Color(0xFF102A43), _phTeal=Color(0xFF16A6A1), _phMuted=Color(0xFF6C8293), _phLine=Color(0xFFE6EEF2);
