@@ -163,7 +163,7 @@ def login(form: Annotated[OAuth2PasswordRequestForm, Depends()]):
             "SELECT id, username, role, display_name, password_hash, active FROM app_users WHERE username=%s",
             (form.username,),
         ).fetchone()
-    if not user or not user["active"]:
+    if not user or not user["active"] or not user["password_hash"]:
         raise HTTPException(status_code=401, detail="Incorrect username or password")
     try:
         hasher.verify(user["password_hash"], form.password)
