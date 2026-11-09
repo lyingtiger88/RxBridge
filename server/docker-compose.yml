@@ -28,9 +28,11 @@ services:
     depends_on:
       db: {condition: service_healthy}
     ports: ["127.0.0.1:8000:8000"]
-    networks: [backend]
+    networks: [backend, egress]
 volumes:
   rxbridge_pgdata:
 networks:
   backend:
     internal: true
+  egress:
+    driver: bridge
