@@ -13,5 +13,13 @@ Accounts: admin01, doctor01, doctor02, patient01, patient02, pharmacy01, insurer
 ## Oracle Always Free
 Create a Free Tier tenancy; choose an ARM Ampere A1 Ubuntu 24.04 VM within current Always Free quota. Verify linux/arm64 image compatibility. Restrict SSH to admin IPs; expose only 80/443; never expose PostgreSQL 5432. Put Caddy/Nginx in front for TLS, bind API to localhost, keep DB on private Docker network. Configure firewall, security updates, off-instance encrypted backups and monitoring. Check regional capacity and test DNS/TLS/latency from multiple Iranian ISPs before choosing region. Free compute has no SLA and availability may vary.
 
+## Pharmacy network API
+
+The pharmacy-network schema is created automatically on a fresh Docker volume. For an existing database, apply the migration once with:
+
+`docker compose exec -T db psql -U rxbridge -d rxbridge < db/002_pharmacy_network.sql`
+
+Authenticated pharmacist endpoints: `GET/PUT /v1/pharmacies/me` and `PUT /v1/pharmacies/me/inventory`. Admin verification: `PATCH /v1/admin/pharmacies/{pharmacy_id}/verification`. Patient matching: `POST /v1/pharmacies/search` with GPS coordinates and exact prescription item details. Matching is strict on medicine, dosage form, strength and package; substitutions are never automatic. Only verified and published pharmacies are searchable. Partial basket subtotals are returned separately and never represented as a complete prescription total.
+
 ## Limitations
-Scaffold only: basic login, current-user, health, aggregate synthetic summary and synthetic consent event. Object-level patient authorization, complete CRUD, token revocation, rate limits, full audit, tested backups, file scanning and security review remain outstanding. Do not invite external testers until those controls are complete. Use fictitious data only.
+Staging scaffold: basic login, current-user, health, aggregate synthetic summary, synthetic consent event, and initial pharmacy profile/inventory/matching endpoints. Object-level patient authorization, complete CRUD, token revocation, rate limits, full audit, tested backups, file scanning and security review remain outstanding. Do not invite external testers until those controls are complete. Use fictitious data only.
