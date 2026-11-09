@@ -49,6 +49,7 @@ jobs:
           psql -h 127.0.0.1 -U rxbridge -d rxbridge -v ON_ERROR_STOP=1 -f server/db/004_pharmacy_audit.sql
           psql -h 127.0.0.1 -U rxbridge -d rxbridge -v ON_ERROR_STOP=1 -f server/db/005_pharmacy_orders.sql
           psql -h 127.0.0.1 -U rxbridge -d rxbridge -v ON_ERROR_STOP=1 -f server/db/006_reservation_expiry.sql
+          psql -h 127.0.0.1 -U rxbridge -d rxbridge -v ON_ERROR_STOP=1 -f server/db/007_app_notifications.sql
       - name: Run PostgreSQL API integration tests
         env:
           JWT_SECRET: ci-test-secret-with-at-least-32-characters
