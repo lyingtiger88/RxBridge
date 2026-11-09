@@ -104,8 +104,11 @@ class _StagingPortalState extends State<StagingPortal> {
             Text('خوش آمدید، ${user!.displayName}', style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold)),
             Text('نقش ثبت‌شده در سرور: ${user!.role}'),
             const SizedBox(height: 10),
-            if (['doctor','patient','pharmacist'].contains(user!.role))
-              _PrescriptionPanel(key: ValueKey(user!.id), backend: backend, role: user!.role)
+            if (['doctor','patient','pharmacist'].contains(user!.role)) ...[
+              _PrescriptionPanel(key: ValueKey(user!.id), backend: backend, role: user!.role),
+              if (['doctor','patient'].contains(user!.role))
+                _HealthyHabitsPanel(backend: backend, role: user!.role),
+            ]
             else
               const Card(child: Padding(
                 padding: EdgeInsets.all(18),
@@ -287,5 +290,164 @@ class _PrescriptionPanelState extends State<_PrescriptionPanel> {
           ],
         ))),
     ],
+  );
+}
+
+class _HealthyHabitsPanel extends StatefulWidget {
+  const _HealthyHabitsPanel({required this.backend, required this.role});
+  final RxBridgeBackend backend;
+  final String role;
+  @override
+  State<_HealthyHabitsPanel> createState() => _HealthyHabitsPanelState();
+}
+
+class _HealthyHabitsPanelState extends State<_HealthyHabitsPanel> {
+  List<PatientSummary> patients = [];
+  List<HabitPlanDto> plans = [];
+  List<HabitLogDto> logs = [];
+  String? patientId;
+  bool busy = true;
+  String? error;
+  final title = TextEditingController();
+  final instruction = TextEditingController();
+  final unit = TextEditingController(text: 'دقیقه');
+  final min = TextEditingController(text: '20');
+  final max = TextEditingController(text: '40');
+  final value = TextEditingController();
+  final feedback = TextEditingController();
+  String habitType = 'activity';
+  int frequency = 1;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    setState(() {busy=true; error=null;});
+    try {
+      final p = await widget.backend.patients.listAuthorizedPatients();
+      final selected = patientId != null && p.any((x)=>x.id==patientId) ? patientId : (p.isEmpty?null:p.first.id);
+      final hp = selected == null ? <HabitPlanDto>[] : await widget.backend.habits.listPlans(patientId:selected);
+      final lg = selected == null ? <HabitLogDto>[] : await widget.backend.habits.listLogs(patientId:selected);
+      if(mounted) setState(() {patients=p;patientId=selected;plans=hp;logs=lg;});
+    } catch(e) { if(mounted) setState(()=>error='دریافت برنامه عادات ناموفق بود: $e'); }
+    finally { if(mounted) setState(()=>busy=false); }
+  }
+
+  Future<void> _createPlan() async {
+    final id=patientId;
+    if(id==null || title.text.trim().isEmpty || instruction.text.trim().isEmpty) return;
+    final lo=double.tryParse(min.text.trim());
+    final hi=double.tryParse(max.text.trim());
+    if(lo!=null && hi!=null && lo>hi) {setState(()=>error='حداقل نباید از حداکثر بیشتر باشد.');return;}
+    setState(()=>busy=true);
+    try {
+      await widget.backend.habits.createPlan(
+        patientId:id,title:title.text,habitType:habitType,
+        instruction:instruction.text,unitLabel:unit.text,
+        targetMin:lo,targetMax:hi,targetDescription:'',
+        frequencyPerDay:frequency,
+      );
+      title.clear();instruction.clear();await _load();
+    } catch(e) {if(mounted)setState(()=>error='ثبت دستور پزشک انجام نشد: $e');}
+  }
+
+  Future<void> _submit(HabitPlanDto plan) async {
+    final v=double.tryParse(value.text.trim());
+    if(v==null || !v.isFinite) {setState(()=>error='مقدار ثبت‌شده باید عدد معتبر باشد.');return;}
+    setState(()=>busy=true);
+    try {
+      await widget.backend.habits.submitLog(
+        planId:plan.id,patientId:plan.patientId,measuredValue:v,
+        completed:true,note:'ثبت خوداظهاری بیمار',occurredAt:DateTime.now(),
+      );
+      value.clear();await _load();
+    } catch(e) {if(mounted)setState(()=>error='ثبت عملکرد انجام نشد: $e');}
+  }
+
+  Future<void> _review(HabitLogDto log) async {
+    setState(()=>busy=true);
+    try { await widget.backend.habits.reviewLog(logId:log.id,feedback:feedback.text);feedback.clear();await _load(); }
+    catch(e) {if(mounted)setState(()=>error='ثبت بازخورد پزشک انجام نشد: $e');}
+  }
+
+  @override
+  void dispose() {title.dispose();instruction.dispose();unit.dispose();min.dispose();max.dispose();value.dispose();feedback.dispose();super.dispose();}
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: const EdgeInsets.only(top:16,bottom:24),
+    child: Padding(padding: const EdgeInsets.all(16),child:Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,children:[
+        const Row(children:[
+          Icon(Icons.eco_rounded,color:Colors.teal),
+          SizedBox(width:8),
+          Expanded(child:Text('عادات سالم و پیگیری درمان',style:TextStyle(fontSize:18,fontWeight:FontWeight.w800))),
+        ]),
+        const Text('دستور پزشک، ثبت عملکرد بیمار و امتیازدهی پس از بازبینی پزشک'),
+        if(error!=null) Padding(padding:const EdgeInsets.only(top:8),child:Text(error!,style:const TextStyle(color:Colors.red))),
+        if(busy) const LinearProgressIndicator(),
+        if(patients.length>1) DropdownButtonFormField<String>(
+          initialValue:patientId,decoration:const InputDecoration(labelText:'پرونده بیمار'),
+          items:patients.map((p)=>DropdownMenuItem(value:p.id,child:Text(p.displayName))).toList(),
+          onChanged:(v){patientId=v;_load();},
+        ),
+        if(widget.role=='doctor') ...[
+          const SizedBox(height:12),
+          const Text('تعریف دستور عادت سالم',style:TextStyle(fontWeight:FontWeight.bold)),
+          TextField(controller:title,decoration:const InputDecoration(labelText:'عنوان عادت؛ مثال پیاده‌روی')),
+          const SizedBox(height:8),
+          TextField(controller:instruction,maxLines:2,decoration:const InputDecoration(labelText:'دستور دقیق پزشک و شرایط اجرا')),
+          const SizedBox(height:8),
+          DropdownButtonFormField<String>(initialValue:habitType,decoration:const InputDecoration(labelText:'دسته'),
+            items:const [
+              DropdownMenuItem(value:'activity',child:Text('فعالیت بدنی')),
+              DropdownMenuItem(value:'hydration',child:Text('آب و مایعات')),
+              DropdownMenuItem(value:'nutrition',child:Text('تغذیه')),
+              DropdownMenuItem(value:'sleep',child:Text('خواب')),
+              DropdownMenuItem(value:'measurement',child:Text('اندازه‌گیری و پایش')),
+              DropdownMenuItem(value:'other',child:Text('سایر')),
+            ],onChanged:(v){if(v!=null)setState(()=>habitType=v);}),
+          Row(children:[
+            Expanded(child:TextField(controller:min,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'حداقل مقدار'))),
+            const SizedBox(width:8),
+            Expanded(child:TextField(controller:max,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'حداکثر مقدار'))),
+            const SizedBox(width:8),
+            Expanded(child:TextField(controller:unit,decoration:const InputDecoration(labelText:'واحد'))),
+          ]),
+          DropdownButtonFormField<int>(initialValue:frequency,decoration:const InputDecoration(labelText:'دفعات در روز'),
+            items:List.generate(24,(i)=>DropdownMenuItem(value:i+1,child:Text('${i+1} بار'))),
+            onChanged:(v){if(v!=null)setState(()=>frequency=v);}),
+          const SizedBox(height:8),
+          FilledButton(onPressed:busy?null:_createPlan,child:const Text('ثبت دستور برای بیمار')),
+        ],
+        const Divider(height:28),
+        for(final plan in plans) ...[
+          ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.track_changes_rounded,color:Colors.teal),
+            title:Text(plan.title,style:const TextStyle(fontWeight:FontWeight.bold)),
+            subtitle:Text('${plan.instruction}\nمحدوده مورد تأیید: ${plan.targetMin??'—'} تا ${plan.targetMax??'—'} ${plan.unitLabel} • ${plan.frequencyPerDay} نوبت در روز')),
+          if(widget.role=='patient') Row(children:[
+            Expanded(child:TextField(controller:value,keyboardType:TextInputType.number,decoration:InputDecoration(labelText:'مقدار انجام‌شده (${plan.unitLabel})'))),
+            const SizedBox(width:8),
+            FilledButton(onPressed:busy?null:()=>_submit(plan),child:const Text('ثبت عملکرد')),
+          ]),
+          for(final log in logs.where((x)=>x.planId==plan.id))
+            Container(margin:const EdgeInsets.only(bottom:8),padding:const EdgeInsets.all(10),
+              decoration:BoxDecoration(color:const Color(0xFFF3F7FA),borderRadius:BorderRadius.circular(12)),
+              child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+                Text('مقدار: ${log.measuredValue??'—'} • وضعیت: ${log.reviewed?(log.pointsAwarded>0?'تأیید شد؛ +۱ امتیاز': 'نیازمند اصلاح'):'در انتظار بازبینی پزشک'}'),
+                if(log.doctorFeedback.isNotEmpty) Text('راهنمایی پزشک: ${log.doctorFeedback}'),
+                if(widget.role=='doctor' && !log.reviewed) ...[
+                  TextField(controller:feedback,decoration:const InputDecoration(labelText:'بازخورد یا راهنمایی پزشک')),
+                  Align(alignment:Alignment.centerLeft,child:FilledButton.tonal(onPressed:busy?null:()=>_review(log),child:const Text('بازبینی و ثبت نتیجه'))),
+                ],
+              ]),
+            ),
+        ],
+        if(plans.isEmpty && !busy) const Text('هنوز دستور عادت سالمی برای این پرونده ثبت نشده است.'),
+        OutlinedButton.icon(onPressed:busy?null:_load,icon:const Icon(Icons.refresh),label:const Text('بروزرسانی')),
+        const Text('امتیاز فقط پس از بازبینی پزشک ثبت می‌شود. ثبت بیمار خوداظهاری است و به‌تنهایی اثبات انجام فعالیت نیست. این سیستم جایگزین توصیه یا ارزیابی بالینی نیست.',
+          style:TextStyle(fontSize:11,color:Colors.blueGrey)),
+      ],
+    )),
   );
 }
