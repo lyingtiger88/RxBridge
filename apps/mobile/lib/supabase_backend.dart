@@ -242,6 +242,7 @@ class _SupabaseHabitRepository implements HabitRepository {
     measuredValue:(r['measured_value'] as num?)?.toDouble(),
     completed:r['completed'] as bool, pointsAwarded:r['points_awarded'] as int,
     occurredAt:DateTime.parse(r['occurred_at'] as String).toUtc(),
+    reviewedAt:r['reviewed_at'] == null ? null : DateTime.parse(r['reviewed_at'] as String).toUtc(),
     reviewed:r['reviewed_at'] != null,
   );
 
