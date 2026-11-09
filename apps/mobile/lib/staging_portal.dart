@@ -387,6 +387,46 @@ class _HealthyHabitsPanelState extends State<_HealthyHabitsPanel> {
     Text(value,style:const TextStyle(fontSize:19,fontWeight:FontWeight.w800,color:Color(0xFF126D68))),
     Text(label,style:const TextStyle(fontSize:10,color:Colors.blueGrey)),
   ]);
+
+  Widget _achievementCard() {
+    final points=logs.fold<int>(0,(sum,log)=>sum+log.pointsAwarded);
+    final String level;
+    final String nextLabel;
+    final int lower;
+    final int upper;
+    final IconData symbol;
+    final Color tint;
+    if(points>=50) {
+      level='طلایی'; nextLabel='بالاترین سطح'; lower=50; upper=50;
+      symbol=Icons.workspace_premium_rounded; tint=const Color(0xFFFFE8A3);
+    } else if(points>=20) {
+      level='نقره‌ای'; nextLabel='تا نشان طلایی'; lower=20; upper=50;
+      symbol=Icons.military_tech_rounded; tint=const Color(0xFFE5E9EF);
+    } else if(points>=5) {
+      level='برنزی'; nextLabel='تا نشان نقره‌ای'; lower=5; upper=20;
+      symbol=Icons.emoji_events_rounded; tint=const Color(0xFFF3D5BD);
+    } else {
+      level='در آغاز مسیر'; nextLabel='تا نشان برنزی'; lower=0; upper=5;
+      symbol=Icons.flag_rounded; tint=const Color(0xFFE8F1F4);
+    }
+    final progress=upper==lower?1.0:((points-lower)/(upper-lower)).clamp(0.0,1.0);
+    final remaining=(upper-points).clamp(0,upper);
+    return Card(child:Padding(padding:const EdgeInsets.all(14),child:Row(children:[
+      Container(width:54,height:54,decoration:BoxDecoration(color:tint,shape:BoxShape.circle),
+        child:Icon(symbol,size:30,color:const Color(0xFF805B24))),
+      const SizedBox(width:12),
+      Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        const Text('نشان پایبندی به برنامه درمان',style:TextStyle(fontSize:12,color:Colors.blueGrey)),
+        Text('سطح $level',style:const TextStyle(fontSize:17,fontWeight:FontWeight.w800)),
+        Text('$points امتیاز تأییدشده • $nextLabel',style:const TextStyle(fontSize:11,color:Colors.blueGrey)),
+        const SizedBox(height:7),
+        ClipRRect(borderRadius:BorderRadius.circular(8),child:LinearProgressIndicator(
+          value:progress,minHeight:7,backgroundColor:const Color(0xFFF0F2F4),color:const Color(0xFF16A6A1))),
+        if(remaining>0) Text('$remaining امتیاز تا سطح بعدی',style:const TextStyle(fontSize:10,color:Colors.blueGrey)),
+      ])),
+    ])));
+  }
+
   Widget _progressSummary() {
     final reviewed=logs.where((x)=>x.reviewed).length;
     final earned=logs.fold<int>(0,(sum,x)=>sum+x.pointsAwarded);
@@ -499,6 +539,7 @@ class _HealthyHabitsPanelState extends State<_HealthyHabitsPanel> {
           FilledButton(onPressed:busy?null:_createPlan,child:const Text('ثبت دستور برای بیمار')),
         ],
         const Divider(height:28),
+        if(plans.isNotEmpty) _achievementCard(),
         if(plans.isNotEmpty) _progressSummary(),
         if(plans.isNotEmpty) _weeklyCalendar(),
         for(final plan in plans) ...[
