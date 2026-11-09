@@ -123,23 +123,14 @@ on public.habit_logs to authenticated;
 create or replace function public.compute_habit_log_result()
 returns trigger language plpgsql set search_path = ''
 as $$
-declare lo numeric; hi numeric; applies boolean;
 begin
-  select target_min,target_max into lo,hi
-  from public.habit_plans where id=new.plan_id and patient_id=new.patient_id;
-  if not found then raise exception 'Habit plan not found for patient'; end if;
-  if not new.completed then
-    new.range_result := 'outside_range'; new.points_awarded := 0;
-  elsif new.measured_value is null or (lo is null and hi is null) then
-    new.range_result := 'not_applicable'; new.points_awarded := 0;
-  elsif (lo is null or new.measured_value >= lo) and (hi is null or new.measured_value <= hi) then
-    new.range_result := 'within_range'; new.points_awarded := 1;
-  else
-    new.range_result := 'outside_range'; new.points_awarded := 0;
-  end if;
-  -- A patient submission is provisional until physician review.
-  new.range_result := case when new.range_result='within_range' then 'pending' else new.range_result end;
+  -- Patient-submitted values are never trusted to assign scores or a clinical status.
+  -- The prescribing doctor reviews and classifies every submission explicitly.
+  new.range_result := 'pending';
   new.points_awarded := 0;
+  new.reviewed_by := null;
+  new.reviewed_at := null;
+  new.doctor_feedback := '';
   return new;
 end $$;
 drop trigger if exists habit_log_compute_result on public.habit_logs;
