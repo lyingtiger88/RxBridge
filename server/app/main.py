@@ -217,7 +217,7 @@ def save_my_pharmacy(body: PharmacyProfileInput, user=Depends(require_roles("pha
               phone=EXCLUDED.phone,
               latitude=EXCLUDED.latitude,
               longitude=EXCLUDED.longitude,
-              is_published=FALSE,
+              is_published=(EXCLUDED.is_published AND pharmacy_profiles.verification_status='verified'),
               verification_status=CASE
                 WHEN pharmacy_profiles.latitude IS DISTINCT FROM EXCLUDED.latitude
                   OR pharmacy_profiles.longitude IS DISTINCT FROM EXCLUDED.longitude
@@ -338,3 +338,24 @@ def search_pharmacies(body: PharmacySearchRequest, user=Depends(require_roles("p
         "matching_policy": "exact medicine, dosage form, strength and package; no automatic substitution",
         "results": results,
     }
+
+
+class PharmacyVerificationInput(BaseModel):
+    verification_status: str = Field(pattern="^(verified|rejected|suspended)$")
+
+
+@app.patch("/v1/admin/pharmacies/{pharmacy_id}/verification")
+def set_pharmacy_verification(pharmacy_id: str, body: PharmacyVerificationInput,
+                              user=Depends(require_roles("admin"))):
+    with connect() as conn:
+        row = conn.execute("""
+            UPDATE pharmacy_profiles
+            SET verification_status=%s,
+                is_published=CASE WHEN %s='verified' THEN is_published ELSE FALSE END,
+                updated_at=now()
+            WHERE id=%s
+            RETURNING id, user_id, pharmacy_name, verification_status, is_published
+        """, (body.verification_status, body.verification_status, pharmacy_id)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Pharmacy not found")
+    return row
