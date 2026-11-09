@@ -49,6 +49,7 @@ class PharmacyReservationApiTests(unittest.TestCase):
     def tearDown(self):
         main.app.dependency_overrides.clear()
         with main.connect() as conn:
+            conn.execute("DELETE FROM pharmacy_orders WHERE pharmacy_id=%s", (self.pharmacy_id,))
             conn.execute("DELETE FROM pharmacy_reservations WHERE pharmacy_id=%s", (self.pharmacy_id,))
             conn.execute("DELETE FROM pharmacy_audit_events WHERE pharmacy_id=%s", (self.pharmacy_id,))
             conn.execute("DELETE FROM pharmacy_profiles WHERE id=%s", (self.pharmacy_id,))
@@ -137,10 +138,6 @@ class PharmacyReservationApiTests(unittest.TestCase):
         self.assertEqual(second.status_code, 201, second.text)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
     def create_order(self, quantity=2):
         reservation = self.reserve(uuid4(), quantity)
         self.assertEqual(reservation.status_code, 201, reservation.text)
@@ -217,3 +214,7 @@ if __name__ == "__main__":
             main.app.dependency_overrides.clear()
             with main.connect() as conn:
                 conn.execute("DELETE FROM app_users WHERE id=%s", (other_patient,))
+
+
+if __name__ == "__main__":
+    unittest.main()
