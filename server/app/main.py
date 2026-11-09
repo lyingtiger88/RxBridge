@@ -106,7 +106,7 @@ def _verify_supabase_token(token: str) -> dict:
             raise ValueError("Token is not an authenticated user session")
         UUID(str(claims["sub"]))
         return claims
-    except (jwt.InvalidTokenError, ValueError, KeyError, httpx.HTTPError) as exc:
+    except (jwt.PyJWTError, ValueError, KeyError, httpx.HTTPError) as exc:
         raise HTTPException(status_code=401, detail="Invalid or expired Supabase access token") from exc
 
 
