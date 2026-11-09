@@ -50,6 +50,7 @@ class PharmacyReservationApiTests(unittest.TestCase):
         main.app.dependency_overrides.clear()
         with main.connect() as conn:
             conn.execute("DELETE FROM pharmacy_reservations WHERE pharmacy_id=%s", (self.pharmacy_id,))
+            conn.execute("DELETE FROM pharmacy_audit_events WHERE pharmacy_id=%s", (self.pharmacy_id,))
             conn.execute("DELETE FROM pharmacy_profiles WHERE id=%s", (self.pharmacy_id,))
             conn.execute("DELETE FROM app_users WHERE id IN (%s,%s)", (self.patient_id, self.pharmacist_id))
 
