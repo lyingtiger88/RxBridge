@@ -893,3 +893,13 @@ def transition_pharmacy_order(order_id: UUID, body: PharmacyOrderTransitionInput
             "SELECT * FROM pharmacy_orders WHERE id=%s", (order_id,)
         ).fetchone()
         return _order_payload(conn, updated_order)
+
+
+
+@app.post("/v1/admin/maintenance/expire-reservations")
+def expire_reservations(user=Depends(require_roles("admin"))):
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT expire_pharmacy_reservations(%s) AS expired_count", (500,)
+        ).fetchone()
+    return {"expired_count": row["expired_count"], "synthetic_data_only": settings.staging_mode}
