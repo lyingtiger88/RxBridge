@@ -449,7 +449,7 @@ class _HealthyHabitsPanelState extends State<_HealthyHabitsPanel> {
           Expanded(child:_metric('ثبت‌ها',logs.length.toString())),
           Expanded(child:_metric('بازبینی‌شده',reviewed.toString())),
           Expanded(child:_metric('امتیاز',earned.toString())),
-          Expanded(child:_metric('پایبندی','\${rate}%')),
+          Expanded(child:_metric('پایبندی','${rate}%')),
         ]),
         const SizedBox(height:8),
         ClipRRect(borderRadius:BorderRadius.circular(8),child:LinearProgressIndicator(
