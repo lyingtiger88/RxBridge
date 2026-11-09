@@ -6,7 +6,7 @@ import jwt
 import psycopg
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -425,6 +425,7 @@ def _reservation_payload(conn, reservation):
 
 @app.post("/v1/pharmacies/{pharmacy_id}/reservations", status_code=201)
 def create_pharmacy_reservation(pharmacy_id: UUID, body: PharmacyReservationInput,
+                                response: Response,
                                 user=Depends(require_roles("patient"))):
     request_hash = hashlib.sha256(json.dumps(
         body.model_dump(mode="json", exclude={"idempotency_key"}),
@@ -438,6 +439,7 @@ def create_pharmacy_reservation(pharmacy_id: UUID, body: PharmacyReservationInpu
         if existing:
             if existing["request_hash"] != request_hash:
                 raise HTTPException(status_code=409, detail="Idempotency key was already used for a different request")
+            response.status_code = 200
             return _reservation_payload(conn, existing)
 
         pharmacy = conn.execute("""
@@ -498,6 +500,7 @@ def create_pharmacy_reservation(pharmacy_id: UUID, body: PharmacyReservationInpu
             """, (user["id"], body.idempotency_key)).fetchone()
             if reservation["request_hash"] != request_hash:
                 raise HTTPException(status_code=409, detail="Idempotency key was already used for a different request")
+            response.status_code = 200
             return _reservation_payload(conn, reservation)
 
         for candidate, requested in selected:
