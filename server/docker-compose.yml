@@ -13,6 +13,7 @@ services:
       - ./db/003_pharmacy_reservations.sql:/docker-entrypoint-initdb.d/003-pharmacy-reservations.sql:ro
       - ./db/004_pharmacy_audit.sql:/docker-entrypoint-initdb.d/004-pharmacy-audit.sql:ro
       - ./db/005_pharmacy_orders.sql:/docker-entrypoint-initdb.d/005-pharmacy-orders.sql:ro
+      - ./db/006_reservation_expiry.sql:/docker-entrypoint-initdb.d/006-reservation-expiry.sql:ro
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER:-rxbridge} -d ${POSTGRES_DB:-rxbridge}"]
       interval: 10s
