@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'backend_contracts.dart';
 import 'backend_factory.dart';
 import 'care_reminders.dart';
+import 'pharmacy_network_pages.dart';
 
 /// Authenticated staging entry point. Never exposes the local demo workspaces.
 class StagingPortal extends StatefulWidget {
@@ -107,6 +108,10 @@ class _StagingPortalState extends State<StagingPortal> {
             const SizedBox(height: 10),
             if (['doctor','patient','pharmacist'].contains(user!.role)) ...[
               _PrescriptionPanel(key: ValueKey(user!.id), backend: backend, role: user!.role),
+              if (user!.role == 'pharmacist')
+                const PharmacyNetworkWorkspace(),
+              if (user!.role == 'patient')
+                const PatientPharmacyFinder(),
               if (['doctor','patient'].contains(user!.role))
                 _HealthyHabitsPanel(backend: backend, role: user!.role),
             ]
