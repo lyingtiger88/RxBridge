@@ -8,7 +8,8 @@ class SupabaseRxBridgeBackend implements RxBridgeBackend {
       : auth = _SupabaseAuthRepository(client),
         patients = _SupabasePatientRepository(client),
         care = _SupabaseCareRepository(client),
-        prescriptions = _SupabasePrescriptionRepository(client);
+        prescriptions = _SupabasePrescriptionRepository(client),
+        habits = _SupabaseHabitRepository(client);
 
   final SupabaseClient client;
   @override
@@ -19,6 +20,8 @@ class SupabaseRxBridgeBackend implements RxBridgeBackend {
   final CareRepository care;
   @override
   final PrescriptionRepository prescriptions;
+  @override
+  final HabitRepository habits;
 
   @override
   Future<void> close() async {
@@ -213,5 +216,90 @@ class _SupabasePrescriptionRepository implements PrescriptionRepository {
       .eq('id', prescriptionId)
       .select('id');
     if (changed.isEmpty) throw StateError('Access denied or prescription not found');
+  }
+}
+
+class _SupabaseHabitRepository implements HabitRepository {
+  const _SupabaseHabitRepository(this.client);
+  final SupabaseClient client;
+
+  HabitPlanDto _mapPlan(Map<String,dynamic> r) => HabitPlanDto(
+    id:r['id'] as String, patientId:r['patient_id'] as String,
+    title:r['title'] as String, habitType:r['habit_type'] as String,
+    instruction:r['instruction'] as String, unitLabel:r['unit_label'] as String,
+    targetDescription:r['target_description'] as String? ?? '',
+    targetMin:(r['target_min'] as num?)?.toDouble(),
+    targetMax:(r['target_max'] as num?)?.toDouble(),
+    frequencyPerDay:r['frequency_per_day'] as int, active:r['active'] as bool,
+  );
+
+  HabitLogDto _mapLog(Map<String,dynamic> r) => HabitLogDto(
+    id:r['id'] as String, planId:r['plan_id'] as String,
+    patientId:r['patient_id'] as String, rangeResult:r['range_result'] as String,
+    doctorFeedback:r['doctor_feedback'] as String? ?? '',
+    measuredValue:(r['measured_value'] as num?)?.toDouble(),
+    completed:r['completed'] as bool, pointsAwarded:r['points_awarded'] as int,
+    occurredAt:DateTime.parse(r['occurred_at'] as String).toUtc(),
+    reviewed:r['reviewed_at'] != null,
+  );
+
+  @override
+  Future<List<HabitPlanDto>> listPlans({required String patientId}) async {
+    final rows=await client.from('habit_plans').select().eq('patient_id',patientId).order('created_at',ascending:false);
+    return rows.map((r)=>_mapPlan(r)).toList(growable:false);
+  }
+
+  @override
+  Future<HabitPlanDto> createPlan({
+    required String patientId, required String title, required String habitType,
+    required String instruction, required String unitLabel,
+    required double? targetMin, required double? targetMax,
+    required String targetDescription, required int frequencyPerDay,
+  }) async {
+    if(title.trim().isEmpty||instruction.trim().isEmpty||frequencyPerDay<1||frequencyPerDay>24||
+      (targetMin!=null&&targetMax!=null&&targetMin>targetMax)) {
+      throw ArgumentError('Invalid physician habit plan');
+    }
+    final doctorId=client.auth.currentUser?.id;
+    if(doctorId==null) throw StateError('Not authenticated');
+    final row=await client.from('habit_plans').insert({
+      'patient_id':patientId,'doctor_id':doctorId,'title':title.trim(),
+      'habit_type':habitType,'instruction':instruction.trim(),'unit_label':unitLabel.trim(),
+      'target_min':targetMin,'target_max':targetMax,
+      'target_description':targetDescription.trim(),'frequency_per_day':frequencyPerDay,
+    }).select().single();
+    return _mapPlan(row);
+  }
+
+  @override
+  Future<List<HabitLogDto>> listLogs({required String patientId}) async {
+    final rows=await client.from('habit_logs').select().eq('patient_id',patientId).order('occurred_at',ascending:false);
+    return rows.map((r)=>_mapLog(r)).toList(growable:false);
+  }
+
+  @override
+  Future<HabitLogDto> submitLog({
+    required String planId, required String patientId,
+    required double? measuredValue, required bool completed,
+    required String note, required DateTime occurredAt,
+  }) async {
+    if(measuredValue!=null && (!measuredValue.isFinite || measuredValue<0 || measuredValue>1000000)) {
+      throw ArgumentError.value(measuredValue,'measuredValue');
+    }
+    final uid=client.auth.currentUser?.id;
+    if(uid==null) throw StateError('Not authenticated');
+    final row=await client.from('habit_logs').insert({
+      'plan_id':planId,'patient_id':patientId,'reported_by':uid,
+      'measured_value':measuredValue,'completed':completed,
+      'note':note.trim(),'occurred_at':occurredAt.toUtc().toIso8601String(),
+    }).select().single();
+    return _mapLog(row);
+  }
+
+  @override
+  Future<void> reviewLog({required String logId, required String feedback}) async {
+    await client.rpc('review_habit_log',params:{
+      'p_log_id':logId,'p_feedback':feedback.trim(),
+    });
   }
 }
