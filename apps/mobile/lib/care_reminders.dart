@@ -70,6 +70,91 @@ class CareReminders {
     return true;
   }
 
+
+  static const habitFirstId = 71400;
+  static const habitSlotCount = 8;
+
+  int _habitBaseId(String planId) {
+    var hash = 0;
+    for (final unit in planId.codeUnits) {
+      hash = (hash * 31 + unit) & 0x7fffffff;
+    }
+    return habitFirstId + (hash % 10000) * habitSlotCount;
+  }
+
+  /// Schedules non-clinical, privacy-preserving local reminders for one habit.
+  /// Reminder text deliberately avoids revealing health details on a lock screen.
+  Future<bool> activateHabitReminders({
+    required String planId,
+    required List<String> times,
+  }) async {
+    if (!Platform.isAndroid && !Platform.isIOS) return false;
+    if (times.isEmpty || times.length > habitSlotCount) return false;
+    final parsed = <TimeOfDay>[];
+    for (final raw in times) {
+      final match = RegExp(r'^(\\d{2}):(\\d{2})
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+    await initialize();
+    for(var i=0;i<slotCount;i++) {await plugin.cancel(id:firstId+i);}
+  }
+}
+).firstMatch(raw);
+      if (match == null) return false;
+      final hour = int.parse(match.group(1)!);
+      final minute = int.parse(match.group(2)!);
+      if (hour > 23 || minute > 59) return false;
+      parsed.add(TimeOfDay(hour: hour, minute: minute));
+    }
+    await initialize();
+    bool permitted = true;
+    if (Platform.isAndroid) {
+      permitted = await plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission() ?? false;
+    } else {
+      permitted = await plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(alert: true, badge: false, sound: true) ?? false;
+    }
+    if (!permitted) return false;
+    await cancelHabitReminders(planId);
+    final now = tz.TZDateTime.now(tz.local);
+    final base = _habitBaseId(planId);
+    for (var i = 0; i < parsed.length; i++) {
+      final time = parsed[i];
+      var next = tz.TZDateTime(tz.local, now.year, now.month, now.day, time.hour, time.minute);
+      if (!next.isAfter(now)) {
+        next = tz.TZDateTime(tz.local, now.year, now.month, now.day + 1, time.hour, time.minute);
+      }
+      await plugin.zonedSchedule(
+        id: base + i,
+        title: 'یادآوری پل سلامت',
+        body: 'زمان انجام برنامه روزانه شما فرا رسیده است.',
+        scheduledDate: next,
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'rxbridge_habit_reminders',
+            'یادآور عادات سالم',
+            channelDescription: 'یادآورهای محلی برنامه عادات سالم',
+            importance: Importance.defaultImportance,
+            priority: Priority.defaultPriority,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    }
+    return true;
+  }
+
+  Future<void> cancelHabitReminders(String planId) async {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+    await initialize();
+    final base = _habitBaseId(planId);
+    for (var i = 0; i < habitSlotCount; i++) {
+      await plugin.cancel(id: base + i);
+    }
+  }
+
   Future<void> cancelGlucoseReminders() async {
     if (!Platform.isAndroid && !Platform.isIOS) return;
     await initialize();
