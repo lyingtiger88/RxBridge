@@ -46,6 +46,12 @@ jobs:
           psql -h 127.0.0.1 -U rxbridge -d rxbridge -v ON_ERROR_STOP=1 -f server/db/init.sql
           psql -h 127.0.0.1 -U rxbridge -d rxbridge -v ON_ERROR_STOP=1 -f server/db/002_pharmacy_network.sql
           psql -h 127.0.0.1 -U rxbridge -d rxbridge -v ON_ERROR_STOP=1 -f server/db/003_pharmacy_reservations.sql
+      - name: Run PostgreSQL API integration tests
+        env:
+          JWT_SECRET: ci-test-secret-with-at-least-32-characters
+          DATABASE_URL: postgresql://rxbridge:ci-only-placeholder@127.0.0.1:5432/rxbridge
+          RXBRIDGE_INTEGRATION_TESTS: "1"
+        run: python -m unittest server.tests.test_pharmacy_reservations_api -v
       - name: Validate Compose configuration
         run: |
           printf 'POSTGRES_PASSWORD=ci-only-placeholder\nDATABASE_URL=postgresql://rxbridge:ci-only-placeholder@db:5432/rxbridge\nJWT_SECRET=ci-only-secret-with-more-than-32-characters\n' > server/.env
