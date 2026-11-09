@@ -21,7 +21,7 @@ class _PharmacyNetworkWorkspaceState extends State<PharmacyNetworkWorkspace> {
   void notice(String s)=>ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s)));
   @override Widget build(BuildContext context)=>Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
     Container(padding:const EdgeInsets.all(18),decoration:BoxDecoration(gradient:const LinearGradient(colors:[_phNavy,Color(0xFF176B78)]),borderRadius:BorderRadius.circular(22)),child:Row(children:[
-      const CircleAvatar(backgroundColor:Color(0x332FFFFFF),child:Icon(Icons.local_pharmacy_rounded,color:Colors.white)),
+      const CircleAvatar(backgroundColor:Color(0x33FFFFFF),child:Icon(Icons.local_pharmacy_rounded,color:Colors.white)),
       const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('پنل داروخانه',style:TextStyle(color:Colors.white,fontWeight:FontWeight.w900,fontSize:19)),
         Text(name.text,style:const TextStyle(color:Colors.white70,fontSize:12)),
@@ -80,7 +80,7 @@ class _PharmacyNetworkWorkspaceState extends State<PharmacyNetworkWorkspace> {
   Future<void> _editItem(List<dynamic> x)async{
     final p=TextEditingController(text:x[3].toString()),q=TextEditingController(text:x[2].toString());
     final ok=await showDialog<bool>(context:context,builder:(c)=>AlertDialog(title:Text('ویرایش '+x[0]),content:Column(mainAxisSize:MainAxisSize.min,children:[TextField(controller:p,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'قیمت (ریال)')),TextField(controller:q,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'موجودی'))]),actions:[TextButton(onPressed:()=>Navigator.pop(c,false),child:const Text('انصراف')),FilledButton(onPressed:()=>Navigator.pop(c,true),child:const Text('ذخیره'))]));
-    if(ok==true&&int.tryParse(p.text)!=null&&int.tryParse(q.text)!=null)setState(()=>{x[2]=int.parse(q.text),x[3]=int.parse(p.text)});
+    if(ok==true&&int.tryParse(p.text)!=null&&int.tryParse(q.text)!=null)setState(() { x[2]=int.parse(q.text); x[3]=int.parse(p.text); });
     p.dispose();q.dispose();
   }
   Widget _profile()=>_box('مشخصات عمومی داروخانه',[
@@ -101,16 +101,16 @@ class PatientPharmacyFinder extends StatefulWidget {
 class _PatientPharmacyFinderState extends State<PatientPharmacyFinder>{
   int sort=0;bool fullOnly=false;
   final results=<List<dynamic>>[
-    ['داروخانه مهر','۱٫۲ کیلومتر',100,1840000,'۵ دقیقه پیش'],
-    ['داروخانه سلامت','۰٫۸ کیلومتر',70,1090000,'۱۲ دقیقه پیش'],
-    ['داروخانه مرکزی','۳ کیلومتر',100,1690000,'۸ دقیقه پیش'],
-    ['داروخانه شبانه‌روزی','۰٫۵ کیلومتر',40,620000,'۲ دقیقه پیش'],
+    ['داروخانه مهر','۱٫۲ کیلومتر',100,1840000,'۵ دقیقه پیش',1.2],
+    ['داروخانه سلامت','۰٫۸ کیلومتر',70,1090000,'۱۲ دقیقه پیش',0.8],
+    ['داروخانه مرکزی','۳ کیلومتر',100,1690000,'۸ دقیقه پیش',3.0],
+    ['داروخانه شبانه‌روزی','۰٫۵ کیلومتر',40,620000,'۲ دقیقه پیش',0.5],
   ];
   @override Widget build(BuildContext context){
     final list=results.where((x)=>!fullOnly||x[2]==100).toList();
     if(sort==0)list.sort((a,b){final c=(b[2] as int).compareTo(a[2] as int);return c!=0?c:(a[3] as int).compareTo(b[3] as int);});
     if(sort==1)list.sort((a,b)=>(a[3] as int).compareTo(b[3] as int));
-    if(sort==2)list.sort((a,b)=>(double.parse((a[1] as String).split(' ')[0].replaceAll('٫','.'))).compareTo(double.parse((b[1] as String).split(' ')[0].replaceAll('٫','.'))));
+    if(sort==2)list.sort((a,b)=>(a[5] as double).compareTo(b[5] as double));
     return Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
       const Text('پیدا کردن داروخانه',style:TextStyle(fontSize:20,fontWeight:FontWeight.w900,color:_phInk)),
       const Text('داروخانه‌های نزدیک با موجودی نسخه شما',style:TextStyle(fontSize:11,color:_phMuted)),
