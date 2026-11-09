@@ -617,6 +617,6 @@ class _AchievementsSheet extends StatelessWidget {
       if(approved.isEmpty) const Text('هنوز امتیاز تأییدشده‌ای ثبت نشده است.'),
       for(final log in approved.reversed.take(30)) ListTile(dense:true,leading:const Icon(Icons.verified_rounded,color:Colors.teal),title:Text('+ ${log.pointsAwarded} امتیاز'),subtitle:Text(MaterialLocalizations.of(context).formatShortDate((log.reviewedAt ?? log.occurredAt).toLocal())),trailing:Text(log.measuredValue==null?'ثبت عادت':'${log.measuredValue}')),
       const Text('این نشان‌ها میزان پایبندی ثبت‌شده را نمایش می‌دهند و معیار نتیجه یا کیفیت درمان نیستند.',style:TextStyle(fontSize:11,color:Colors.blueGrey)),
-    ])));
+    ]))));
   }
 }
