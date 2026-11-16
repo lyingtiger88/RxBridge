@@ -75,6 +75,57 @@ jobs:
           path: apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
 
+  android-selfsigned-test:
+    name: Android / Self-signed test APK (not for production updates)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Bootstrap Flutter Android project
+        run: flutter create --platforms=android --project-name rxbridge apps/mobile
+      - name: Configure app label and dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path("apps/mobile/android/app/src/main/AndroidManifest.xml")
+          s=p.read_text()
+          s,n=re.subn(r'android:label="[^"]+"','android:label="پل سلامت"',s,count=1)
+          if n == 0: raise SystemExit("Android app label not found")
+          p.write_text(s)
+          PY
+          python3 apps/mobile/tool/configure_notifications.py
+          cd apps/mobile
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Build Android test APK
+        run: cd apps/mobile && flutter build apk --debug
+      - name: Re-sign APK with a temporary BDFR test key and verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n1)"
+          mkdir -p out/signing
+          keytool -genkeypair -noprompt -keystore "$RUNNER_TEMP/rxbridge-test.jks" -storetype JKS -storepass "$GITHUB_RUN_ID" -keypass "$GITHUB_RUN_ID" -alias rxbridge-test -keyalg RSA -keysize 3072 -validity 3650 -dname "CN=BDFR Test Publisher"
+          "$BUILD_TOOLS/zipalign" -f 4 apps/mobile/build/app/outputs/flutter-apk/app-debug.apk "$RUNNER_TEMP/rxbridge-aligned.apk"
+          "$BUILD_TOOLS/apksigner" sign --ks "$RUNNER_TEMP/rxbridge-test.jks" --ks-key-alias rxbridge-test --ks-pass "pass:$GITHUB_RUN_ID" --key-pass "pass:$GITHUB_RUN_ID" --out out/RxBridge-Android-SelfSigned-Test.apk "$RUNNER_TEMP/rxbridge-aligned.apk"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs out/RxBridge-Android-SelfSigned-Test.apk
+          keytool -exportcert -rfc -keystore "$RUNNER_TEMP/rxbridge-test.jks" -storepass "$GITHUB_RUN_ID" -alias rxbridge-test -file out/signing/BDFR-RxBridge-Test-Certificate.pem
+          sha256sum out/RxBridge-Android-SelfSigned-Test.apk | tee out/signing/SHA256SUMS.txt
+          rm -f "$RUNNER_TEMP/rxbridge-test.jks" "$RUNNER_TEMP/rxbridge-aligned.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RxBridge-Android-SelfSigned-Test
+          path: out/**
+          if-no-files-found: error
+          retention-days: 30
+
   ios-test:
     name: iOS / Unsigned Simulator
     runs-on: macos-latest
