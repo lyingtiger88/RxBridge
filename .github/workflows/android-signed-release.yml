@@ -40,9 +40,14 @@ jobs:
           chmod 600 "$RUNNER_TEMP/bdfr-codesign.pfx"
           keytool -list -v -storetype PKCS12 -keystore "$RUNNER_TEMP/bdfr-codesign.pfx" -storepass "$PFX_PASSWORD" > "$RUNNER_TEMP/pfx-info.txt"
           ALIAS="$(sed -n 's/^Alias name: //p' "$RUNNER_TEMP/pfx-info.txt" | head -n1)"
+          CERT_THUMBPRINT="$(sed -n 's/^[[:space:]]*SHA1: //p' "$RUNNER_TEMP/pfx-info.txt" | head -n1 | tr -d '[:space:]:')"
           CERT_SHA="$(sed -n 's/^[[:space:]]*SHA256: //p' "$RUNNER_TEMP/pfx-info.txt" | head -n1 | tr -d '[:space:]:')"
-          if [[ -z "$ALIAS" || "${CERT_SHA^^}" != "${EXPECTED_THUMBPRINT^^}" && -z "$CERT_SHA" ]]; then
+          if [[ -z "$ALIAS" || -z "$CERT_THUMBPRINT" || -z "$CERT_SHA" ]]; then
             echo "::error::Could not read BDFR PKCS12 certificate identity."
+            exit 1
+          fi
+          if [[ "${CERT_THUMBPRINT^^}" != "${EXPECTED_THUMBPRINT^^}" ]]; then
+            echo "::error::PFX certificate thumbprint does not match the configured BDFR identity."
             exit 1
           fi
           echo "BDFR_PFX_PATH=$RUNNER_TEMP/bdfr-codesign.pfx" >> "$GITHUB_ENV"
