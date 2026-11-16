@@ -1,0 +1,107 @@
+name: RxBridge Android signed release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/android-signed-release.yml"
+      - "apps/mobile/**"
+
+permissions:
+  contents: read
+
+jobs:
+  android-signed:
+    name: Build and sign Android APK with persistent BDFR identity
+    runs-on: ubuntu-latest
+    env:
+      PFX_BASE64: ${{ secrets.BDFR_CODESIGN_PFX_BASE64 }}
+      PFX_PASSWORD: ${{ secrets.BDFR_CODESIGN_PFX_PASSWORD }}
+      EXPECTED_THUMBPRINT: ${{ secrets.BDFR_CODESIGN_THUMBPRINT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Verify BDFR PFX and extract Android signing identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in PFX_BASE64 PFX_PASSWORD EXPECTED_THUMBPRINT; do
+            if [[ -z "${!name:-}" ]]; then echo "::error::Missing secret: $name"; exit 1; fi
+          done
+          printf '%s' "$PFX_BASE64" | base64 --decode > "$RUNNER_TEMP/bdfr-codesign.pfx"
+          chmod 600 "$RUNNER_TEMP/bdfr-codesign.pfx"
+          keytool -list -v -storetype PKCS12 -keystore "$RUNNER_TEMP/bdfr-codesign.pfx" -storepass "$PFX_PASSWORD" > "$RUNNER_TEMP/pfx-info.txt"
+          ALIAS="$(sed -n 's/^Alias name: //p' "$RUNNER_TEMP/pfx-info.txt" | head -n1)"
+          CERT_SHA="$(sed -n 's/^[[:space:]]*SHA256: //p' "$RUNNER_TEMP/pfx-info.txt" | head -n1 | tr -d '[:space:]:')"
+          if [[ -z "$ALIAS" || "${CERT_SHA^^}" != "${EXPECTED_THUMBPRINT^^}" && -z "$CERT_SHA" ]]; then
+            echo "::error::Could not read BDFR PKCS12 certificate identity."
+            exit 1
+          fi
+          echo "BDFR_PFX_PATH=$RUNNER_TEMP/bdfr-codesign.pfx" >> "$GITHUB_ENV"
+          echo "BDFR_PFX_ALIAS=$ALIAS" >> "$GITHUB_ENV"
+          echo "BDFR_PFX_SHA256=$CERT_SHA" >> "$GITHUB_ENV"
+          echo "BDFR Android signing alias loaded: $ALIAS"
+      - name: Bootstrap Flutter Android project
+        run: flutter create --platforms=android --project-name rxbridge apps/mobile
+      - name: Configure app label and dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path("apps/mobile/android/app/src/main/AndroidManifest.xml")
+          s=p.read_text()
+          s,n=re.subn(r'android:label="[^"]+"','android:label="پل سلامت"',s,count=1)
+          if n == 0: raise SystemExit("Android app label not found")
+          p.write_text(s)
+          PY
+          python3 apps/mobile/tool/configure_notifications.py
+          cd apps/mobile
+          flutter pub get
+          flutter test
+      - name: Build unsigned release APK
+        run: cd apps/mobile && flutter build apk --release --build-number "$((10000 + $GITHUB_RUN_NUMBER))"
+      - name: Align and sign APK with persistent BDFR PKCS12 certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n1)"
+          mkdir -p out/signing
+          cp "$BDFR_PFX_PATH" out/signing/BDFR-Android-Signing.p12
+          "$BUILD_TOOLS/zipalign" -f 4 apps/mobile/build/app/outputs/flutter-apk/app-release.apk "$RUNNER_TEMP/rxbridge-aligned.apk"
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks "$BDFR_PFX_PATH" \
+            --ks-type PKCS12 \
+            --ks-key-alias "$BDFR_PFX_ALIAS" \
+            --ks-pass "pass:$PFX_PASSWORD" \
+            --key-pass "pass:$PFX_PASSWORD" \
+            --out out/RxBridge-Android-Signed.apk \
+            "$RUNNER_TEMP/rxbridge-aligned.apk"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs out/RxBridge-Android-Signed.apk
+          ACTUAL_CERT_SHA="$( "$BUILD_TOOLS/apksigner" verify --print-certs out/RxBridge-Android-Signed.apk | sed -n 's/Signer #1 certificate SHA-256 digest: //p' | head -n1 | tr -d '[:space:]:' )"
+          if [[ "${ACTUAL_CERT_SHA^^}" != "${BDFR_PFX_SHA256^^}" ]]; then
+            echo "::error::Final APK signer does not match BDFR certificate."
+            exit 1
+          fi
+          rm -f out/signing/BDFR-Android-Signing.p12 "$RUNNER_TEMP/rxbridge-aligned.apk"
+          sha256sum out/RxBridge-Android-Signed.apk | tee out/signing/SHA256SUMS.txt
+          keytool -exportcert -rfc -storetype PKCS12 -keystore "$BDFR_PFX_PATH" -storepass "$PFX_PASSWORD" -alias "$BDFR_PFX_ALIAS" -file out/signing/BDFR-Android-Certificate.pem
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RxBridge-Android-Signed-Release
+          path: out/**
+          if-no-files-found: error
+          retention-days: 60
+      - name: Remove temporary signing material
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/bdfr-codesign.pfx" "$RUNNER_TEMP/pfx-info.txt" "$RUNNER_TEMP/rxbridge-aligned.apk"
