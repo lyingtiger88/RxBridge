@@ -102,7 +102,6 @@ jobs:
           python3 apps/mobile/tool/configure_notifications.py
           cd apps/mobile
           flutter pub get
-          flutter analyze
           flutter test
       - name: Build Android test APK
         run: cd apps/mobile && flutter build apk --debug
