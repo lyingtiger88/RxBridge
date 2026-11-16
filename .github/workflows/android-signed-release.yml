@@ -46,9 +46,15 @@ jobs:
           fi
           ALIAS="$(sed -n 's/^Alias name: //p' "$RUNNER_TEMP/pfx-info.txt" | head -n1)"
           CERT_THUMBPRINT="$(sed -n 's/^[[:space:]]*SHA1: //p' "$RUNNER_TEMP/pfx-info.txt" | head -n1 | tr -d '[:space:]:')"
-          CERT_SHA="$(sed -n 's/^[[:space:]]*SHA256: //p' "$RUNNER_TEMP/pfx-info.txt" | head -n1 | tr -d '[:space:]:')"
-          if [[ -z "$ALIAS" || -z "$CERT_THUMBPRINT" || -z "$CERT_SHA" ]]; then
+          if [[ -z "$ALIAS" || -z "$CERT_THUMBPRINT" ]]; then
             echo "::error::Could not read BDFR PKCS12 certificate identity."
+            exit 1
+          fi
+          keytool -exportcert -rfc -storetype PKCS12 -keystore "$RUNNER_TEMP/bdfr-codesign.pfx" -storepass "$PFX_PASSWORD" -alias "$ALIAS" -file "$RUNNER_TEMP/bdfr-certificate.pem"
+          openssl x509 -in "$RUNNER_TEMP/bdfr-certificate.pem" -outform DER -out "$RUNNER_TEMP/bdfr-certificate.der"
+          CERT_SHA="$(sha256sum "$RUNNER_TEMP/bdfr-certificate.der" | awk '{print toupper($1)}')"
+          if [[ -z "$CERT_SHA" ]]; then
+            echo "::error::Could not calculate SHA-256 of BDFR certificate."
             exit 1
           fi
           if [[ "${CERT_THUMBPRINT^^}" != "${EXPECTED_THUMBPRINT^^}" ]]; then
@@ -101,10 +107,12 @@ jobs:
             --key-pass "pass:$PFX_PASSWORD" \
             --out out/RxBridge-Android-Signed.apk \
             "$RUNNER_TEMP/rxbridge-aligned.apk"
-          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs out/RxBridge-Android-Signed.apk
-          ACTUAL_CERT_SHA="$( "$BUILD_TOOLS/apksigner" verify --print-certs out/RxBridge-Android-Signed.apk | sed -n 's/Signer #1 certificate SHA-256 digest: //p' | head -n1 | tr -d '[:space:]:' )"
-          if [[ "${ACTUAL_CERT_SHA^^}" != "${BDFR_PFX_SHA256^^}" ]]; then
-            echo "::error::Final APK signer does not match BDFR certificate."
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs out/RxBridge-Android-Signed.apk | tee "$RUNNER_TEMP/apk-signature-report.txt"
+          ACTUAL_CERT_SHA="$(awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {gsub(/[[:space:]:]/, "", $2); print toupper($2); exit}' "$RUNNER_TEMP/apk-signature-report.txt")"
+          echo "Expected BDFR certificate SHA-256: ${BDFR_PFX_SHA256^^}"
+          echo "Actual APK signer SHA-256: ${ACTUAL_CERT_SHA:-<not-reported>}"
+          if [[ -z "$ACTUAL_CERT_SHA" || "${ACTUAL_CERT_SHA^^}" != "${BDFR_PFX_SHA256^^}" ]]; then
+            echo "::error::Final APK signer does not match BDFR certificate; see signer report above."
             exit 1
           fi
           rm -f out/signing/BDFR-Android-Signing.p12 "$RUNNER_TEMP/rxbridge-aligned.apk"
