@@ -38,7 +38,11 @@ jobs:
           done
           printf '%s' "$PFX_BASE64" | base64 --decode > "$RUNNER_TEMP/bdfr-codesign.pfx"
           chmod 600 "$RUNNER_TEMP/bdfr-codesign.pfx"
-          keytool -list -v -storetype PKCS12 -keystore "$RUNNER_TEMP/bdfr-codesign.pfx" -storepass "$PFX_PASSWORD" > "$RUNNER_TEMP/pfx-info.txt"
+          if ! keytool -list -v -storetype PKCS12 -keystore "$RUNNER_TEMP/bdfr-codesign.pfx" -storepass "$PFX_PASSWORD" > "$RUNNER_TEMP/pfx-info.txt" 2>&1; then
+            echo "::error::PFX could not be opened by keytool. Check that PFX_BASE64 is the complete Base64 export and PFX_PASSWORD is the matching export password."
+            sed -E 's/(password|passphrase)[^:]*:.*/\\1: [redacted]/Ig' "$RUNNER_TEMP/pfx-info.txt" | tail -n 8
+            exit 1
+          fi
           ALIAS="$(sed -n 's/^Alias name: //p' "$RUNNER_TEMP/pfx-info.txt" | head -n1)"
           CERT_THUMBPRINT="$(sed -n 's/^[[:space:]]*SHA1: //p' "$RUNNER_TEMP/pfx-info.txt" | head -n1 | tr -d '[:space:]:')"
           CERT_SHA="$(sed -n 's/^[[:space:]]*SHA256: //p' "$RUNNER_TEMP/pfx-info.txt" | head -n1 | tr -d '[:space:]:')"
