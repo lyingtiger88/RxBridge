@@ -108,7 +108,7 @@ jobs:
             --out out/RxBridge-Android-Signed.apk \
             "$RUNNER_TEMP/rxbridge-aligned.apk"
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs out/RxBridge-Android-Signed.apk | tee "$RUNNER_TEMP/apk-signature-report.txt"
-          ACTUAL_CERT_SHA="$(awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {gsub(/[[:space:]:]/, "", $2); print toupper($2); exit}' "$RUNNER_TEMP/apk-signature-report.txt")"
+          ACTUAL_CERT_SHA="$(awk -F': ' '/certificate SHA-256 digest:/ {gsub(/[[:space:]:]/, "", $2); print toupper($2); exit}' "$RUNNER_TEMP/apk-signature-report.txt")"
           echo "Expected BDFR certificate SHA-256: ${BDFR_PFX_SHA256^^}"
           echo "Actual APK signer SHA-256: ${ACTUAL_CERT_SHA:-<not-reported>}"
           if [[ -z "$ACTUAL_CERT_SHA" || "${ACTUAL_CERT_SHA^^}" != "${BDFR_PFX_SHA256^^}" ]]; then
