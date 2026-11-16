@@ -27,6 +27,7 @@ jobs:
           java-version: "17"
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: "3.38.2"
           channel: stable
           cache: true
       - name: Verify BDFR PFX and extract Android signing identity
@@ -69,8 +70,16 @@ jobs:
           import re
           p=Path("apps/mobile/android/app/src/main/AndroidManifest.xml")
           s=p.read_text()
-          s,n=re.subn(r'android:label="[^"]+"','android:label="پل سلامت"',s,count=1)
-          if n == 0: raise SystemExit("Android app label not found")
+          app=re.search(r'<application\\b[^>]*>',s,re.DOTALL)
+          if app is None:
+              raise SystemExit("AndroidManifest.xml has no application element")
+          tag=app.group(0)
+          if re.search(r'\\bandroid:label\\s*=',tag):
+              tag=re.sub(r'android:label\\s*=\\s*("[^"]*"|\\'[^\\']*\\')',
+                         'android:label="پل سلامت"',tag,count=1)
+          else:
+              tag=tag[:-1] + ' android:label="پل سلامت">'
+          s=s[:app.start()]+tag+s[app.end():]
           p.write_text(s)
           PY
           python3 apps/mobile/tool/configure_notifications.py
