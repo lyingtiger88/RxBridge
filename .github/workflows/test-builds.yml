@@ -72,8 +72,12 @@ jobs:
           flutter pub get
           flutter analyze --no-fatal-infos
           flutter test
-      - name: Build Android debug APK
-        run: cd apps/mobile && flutter build apk --debug
+      - name: Build Android debug APK with Gradle diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd apps/mobile/android
+          ./gradlew assembleDebug --stacktrace --info
       - uses: actions/upload-artifact@v4
         with:
           name: RxBridge-Android-Debug-APK
